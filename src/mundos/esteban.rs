@@ -6,10 +6,10 @@ use crate::noise::{Perlin, Rng};
 use crate::planet::{Orbit, Planet, PlanetDef, Terrain, TerrainKind};
 use crate::planets::model;
 use crate::props::{Placement, PropSpec, append_transformed};
-use crate::shader::{Shader, Uniforms, Varyings, lambert, rim, toon_diffuse};
+use crate::shader::{Shader, Uniforms, Varyings, blinn_phong, lambert, rim, toon_diffuse};
 
 pub fn planetas() -> Result<Vec<Planet>, String> {
-    Ok(vec![lava()?, desierto()?, mecanico()?])
+    Ok(vec![lava()?, desierto()?, mecanico()?, cristalino()?])
 }
 
 // Ruido celular con hash entero: evita calcular senos en las 27 celdas
@@ -145,6 +145,52 @@ fn mecanico() -> Result<Planet, String> {
     Ok(Planet::new(def, Box::new(MecanicoShader { amplitud: terreno.amplitude })).with_props(objetos))
 }
 
+struct CristalinoShader {
+    ruido: Perlin,
+    amplitud: f32,
+}
+
+impl Shader for CristalinoShader {
+    fn fragment(&self, v: &Varyings, u: &Uniforms) -> Vec3 {
+        let dir = v.local_pos.normalize();
+        let altura = (v.local_pos.length() - 1.0) / self.amplitud;
+        let normal = v.normal.normalize();
+        let luz = lambert(normal, v.world_pos, u.sun_pos);
+        // Un ruido continuo forma vetas, y la altura distingue cimas y valles.
+        let veta = self.ruido.fbm(dir * 5.0 + Vec3::splat(8.0), 3).abs();
+        let brillo_veta = 1.0 - smoothstep(0.025, 0.10, veta);
+        let roca = Vec3::new(0.13, 0.08, 0.32).lerp(
+            Vec3::new(0.43, 0.23, 0.65), smoothstep(-0.35, 0.65, altura),
+        );
+        // El reflejo depende del ángulo de la cámara; las vetas brillan de noche.
+        let reflejo = smoothstep(0.45, 0.58, blinn_phong(normal, v.world_pos, u.sun_pos, u.camera_pos, 24.0));
+        let borde = smoothstep(0.55, 1.0, rim(normal, v.world_pos, u.camera_pos));
+        let pulso = 0.8 + 0.2 * (u.time * 1.3 + dir.y * 5.0).sin();
+        roca * toon_diffuse(luz, 0.20)
+            + Vec3::new(0.20, 0.90, 1.0) * (brillo_veta * pulso * 0.60 + borde * 0.28)
+            + Vec3::new(0.80, 0.90, 1.0) * (reflejo * 0.55)
+    }
+}
+
+fn cristalino() -> Result<Planet, String> {
+    let terreno = Terrain { kind: TerrainKind::Ridged, amplitude: 0.08, frequency: 2.3, octaves: 4, sea_level: None };
+    let def = PlanetDef {
+        name: "Cristalino", radius: 6.5,
+        orbit: Orbit { radius: 170.0, speed: 0.01, phase: 2.8, inclination: 0.04 },
+        spin_speed: 0.09, axial_tilt: 0.24, seed: WORLD_SEED + 23, terrain: terreno,
+    };
+    let objetos = vec![
+        PropSpec { name: "Cristales", mesh: model("cristal_grupo")?, count: 75,
+            placement: Placement::Scatter, scale: (0.65, 1.25), height: (-1.0, 1.0),
+            density_frequency: 2.8, density_threshold: -0.08, max_slope: 0.45, sink: 0.06, max_tilt: 0.12 },
+        PropSpec { name: "Monolitos", mesh: model("cristal_monolito")?, count: 22,
+            placement: Placement::Scatter, scale: (0.8, 1.2), height: (-0.4, 1.0),
+            density_frequency: 2.0, density_threshold: -0.10, max_slope: 0.35, sink: 0.08, max_tilt: 0.06 },
+    ];
+    let shader = CristalinoShader { ruido: Perlin::new(def.seed + 100), amplitud: terreno.amplitude };
+    Ok(Planet::new(def, Box::new(shader)).with_props(objetos))
+}
+
 fn lava() -> Result<Planet, String> {
     let terreno = Terrain { kind: TerrainKind::Ridged, amplitude: 0.12, frequency: 2.0, octaves: 5, sea_level: None };
     let def = PlanetDef {
@@ -214,7 +260,12 @@ mod pruebas {
     fn mundos_y_anillo_son_reproducibles_y_quedan_en_el_limite() {
         let a = planetas().unwrap();
         let b = planetas().unwrap();
-        assert_eq!(a.len(), 3);
+        assert_eq!(a.len(), 4);
+        assert_eq!(a[2].def.name, "Mecanico");
+        assert_eq!(a[3].def.name, "Cristalino");
+        assert_eq!(a[2].def.orbit.radius, 145.0);
+        assert_eq!(a[3].def.orbit.radius, 170.0);
+        assert_ne!(a[2].def.seed, a[3].def.seed);
         for (primero, segundo) in a.iter().zip(&b) {
             let objetos = primero.props.as_ref().unwrap();
             assert_eq!(objetos.mesh.positions, segundo.props.as_ref().unwrap().mesh.positions);
