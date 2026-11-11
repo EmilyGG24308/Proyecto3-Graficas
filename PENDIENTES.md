@@ -40,7 +40,8 @@ de cerca debería quedar por debajo de ~10 ms en una Mac M-series.
 |---|---|---|---|
 | Planeta 1: Jungla jurásica | 10 | ✅ | `planets.rs`, `shaders/jungle.rs` |
 | Planeta 2: Embrujado | 10 | ✅ | `planets.rs`, `shaders/haunted.rs` |
-| Planetas 3–6 (2 de Esteban, 2 de Emily) | 30 (máx. 5 planetas puntúan) | ⬜ | ver §3 |
+| Planetas 3–4: Lava y Desierto (Esteban) | 20 | ✅ | `src/mundos/esteban.rs` |
+| Planetas 5–6: Ciudad y Hielo (Emily) | 10 (máx. 5 planetas puntúan) | ⬜ | ver §3 |
 | 4 shaders distintos (ya hay 6: sol, jungla, embrujado, toon, flama, fantasma) | 24 | ✅ | `src/shaders/` |
 | Shader animado (sol, flama, lava de la jungla, niebla del embrujado) | 8 | ✅ | `sun.rs`, `thruster.rs`, `jungle.rs`, `haunted.rs` |
 | Deformación del planeta con ruido | 10 | ✅ | `planet.rs` → `build_terrain_mesh` |
