@@ -238,3 +238,28 @@ for lado in (-1, 1):
     m.caja((lado * 0.54, 0, 1.06), (0.12, 0.12, 0.40), "Bronce")
 m.esfera((0, 0, 1.62), (0.15, 0.15, 0.15), 6, 4, "Energia")
 m.exportar()
+
+material("CristalTurquesa", (0.12, 0.78, 0.82))
+material("CristalVioleta", (0.53, 0.25, 0.76))
+material("CristalClaro", (0.54, 0.95, 1.0), emisivo=True)
+material("PiedraCristal", (0.19, 0.13, 0.36))
+
+# Grupo de cristales angulares con puntas de diferentes alturas.
+m = Modelo("cristal_grupo")
+for x, y, alto, radio, material_cristal in [
+    (0, 0, 1.60, 0.29, "CristalTurquesa"),
+    (0.36, 0.08, 0.92, 0.22, "CristalVioleta"),
+    (-0.30, 0.15, 1.13, 0.21, "CristalTurquesa"),
+    (0.02, -0.33, 0.72, 0.18, "CristalVioleta"),
+]:
+    m.cono((x, y, alto * 0.35), radio, radio * 0.82, alto * 0.70, 5, material_cristal)
+    m.cono((x, y, alto * 0.85), radio * 0.82, 0, alto * 0.30, 5, "CristalClaro")
+m.exportar()
+
+# Monolito más alto sobre una base facetada.
+m = Modelo("cristal_monolito")
+m.cono((0, 0, 0.12), 0.50, 0.43, 0.24, 6, "PiedraCristal")
+m.cono((0, 0, 0.80), 0.30, 0.24, 1.20, 6, "CristalVioleta")
+m.cono((0, 0, 1.70), 0.24, 0, 0.60, 6, "CristalClaro")
+m.cono((0, 0, 0.28), 0.38, 0.38, 0.08, 6, "CristalTurquesa")
+m.exportar()
