@@ -1,16 +1,25 @@
 //! La escena: qué objetos hay, dónde están en cada instante y cómo se dibujan.
+//!
+//! Antes de mandar un cuerpo al pipeline se hacen dos decisiones que cambian
+//! el trabajo del renderizador (y se ven en los contadores del HUD):
+//!  - Culling de objetos: si su esfera envolvente está fuera del frustum, no
+//!    se procesa ni un solo vértice.
+//!  - Nivel de detalle: según cuántos pixeles ocupa en pantalla, se elige una
+//!    malla con más o menos triángulos.
 
 use std::path::{Path, PathBuf};
 
 use crate::camera::Camera;
-use crate::collision::Collider;
+use crate::collision::{Collider, Surface};
 use crate::config::*;
 use crate::math::{Mat4, Vec3};
 use crate::mesh::{self, Mesh};
 use crate::noise::Perlin;
+use crate::planet::{Planet, Terrain, build_terrain_mesh};
+use crate::planets;
 use crate::renderer::{DrawOptions, Renderer};
-use crate::shader::Uniforms;
-use crate::shaders::{SunShader, TestPlanetShader, ThrusterDraw, ThrusterParams, ThrusterShader, ToonShader};
+use crate::shader::{Shader, Uniforms};
+use crate::shaders::{SunShader, ThrusterDraw, ThrusterParams, ThrusterShader, ToonShader};
 use crate::ship::{self, ShipState};
 use crate::starfield::Starfield;
 
@@ -24,16 +33,28 @@ pub struct ShipView {
     pub visible: bool,
 }
 
+/// Qué pasó con cada cuerpo en el último cuadro (para el HUD).
+#[derive(Clone, Copy, Debug)]
+pub struct BodyReport {
+    pub name: &'static str,
+    /// None = descartado por estar fuera de la vista.
+    pub lod: Option<usize>,
+    pub triangles: usize,
+    pub pixels: f32,
+}
+
 pub struct Scene {
     stars: Starfield,
-    sun_mesh: Mesh,
-    planet_mesh: Mesh,
+    sun_lods: Vec<Mesh>,
+    pub planets: Vec<Planet>,
     ship_mesh: Mesh,
     flame_mesh: Mesh,
     sun_shader: SunShader,
-    planet_shader: TestPlanetShader,
     toon: ToonShader,
     thruster: ThrusterShader,
+    /// Interruptores para comparar en vivo (F3 / F4).
+    pub culling_enabled: bool,
+    pub lod_enabled: bool,
 }
 
 /// Busca un recurso relativo a la carpeta actual o a la del proyecto.
@@ -45,18 +66,29 @@ pub fn asset_path(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
 }
 
+/// Elige el nivel de detalle según el tamaño en pantalla (radio en pixeles).
+pub fn select_lod(radius_px: f32, levels: usize) -> usize {
+    let lod = LOD_PIXEL_THRESHOLDS.iter().filter(|&&t| radius_px >= t).count();
+    lod.min(levels - 1)
+}
+
 impl Scene {
     pub fn new() -> Result<Self, String> {
+        let sun_noise = Perlin::new(WORLD_SEED);
         Ok(Self {
             stars: Starfield::new(STAR_COUNT, WORLD_SEED),
-            sun_mesh: mesh::icosphere(4),
-            planet_mesh: mesh::icosphere(TEST_PLANET_SUBDIV),
+            sun_lods: LOD_SUBDIVISIONS
+                .iter()
+                .map(|&s| build_terrain_mesh(&Terrain::FLAT, &sun_noise, s.min(4)))
+                .collect(),
+            planets: planets::solar_system(),
             ship_mesh: mesh::load_obj(asset_path("assets/models/nave.obj"))?,
             flame_mesh: mesh::cone(12, 4),
-            sun_shader: SunShader { noise: Perlin::new(WORLD_SEED), speed: SUN_ANIM_SPEED, bands: 6.0 },
-            planet_shader: TestPlanetShader { noise: Perlin::new(WORLD_SEED + 1) },
+            sun_shader: SunShader { noise: sun_noise, speed: SUN_ANIM_SPEED, bands: 6.0 },
             toon: ToonShader { ambient: 0.36, outline: 0.35 },
             thruster: ThrusterShader { noise: Perlin::new(WORLD_SEED + 7) },
+            culling_enabled: true,
+            lod_enabled: true,
         })
     }
 
@@ -64,38 +96,50 @@ impl Scene {
         Vec3::ZERO
     }
 
-    /// Posición del planeta de prueba en el instante `time` (segundos).
-    /// Depende solo del tiempo transcurrido, nunca del número de cuadros.
-    pub fn planet_pos(time: f32) -> Vec3 {
-        let orbit = time * TEST_PLANET_ORBIT_SPEED;
-        Vec3::new(orbit.cos(), 0.0, -orbit.sin()) * TEST_PLANET_ORBIT
-    }
-
-    /// Velocidad del planeta de prueba (derivada de `planet_pos`).
-    pub fn planet_velocity(time: f32) -> Vec3 {
-        let w = TEST_PLANET_ORBIT_SPEED;
-        let a = time * w;
-        Vec3::new(-a.sin(), 0.0, -a.cos()) * (TEST_PLANET_ORBIT * w)
-    }
-
     /// Cuerpos sólidos en el instante `time`.
-    pub fn colliders(&self, time: f32) -> Vec<Collider> {
-        vec![
-            Collider { center: self.sun_pos(), velocity: Vec3::ZERO, radius: SUN_RADIUS, name: "Sol" },
-            Collider {
-                center: Self::planet_pos(time),
-                velocity: Self::planet_velocity(time),
-                radius: TEST_PLANET_RADIUS,
-                name: "Planeta",
-            },
-        ]
+    pub fn colliders(&self, time: f32) -> Vec<Collider<'_>> {
+        let mut out = vec![Collider::sphere(self.sun_pos(), Vec3::ZERO, SUN_RADIUS, "Sol")];
+        for p in &self.planets {
+            out.push(Collider {
+                center: p.position(time),
+                velocity: p.velocity(time),
+                surface: Surface::Terrain { planet: p, inv_rotation: p.rotation(time).transpose() },
+                name: p.def.name,
+            });
+        }
+        out
     }
 
     pub fn ship_triangles(&self) -> usize {
         self.ship_mesh.triangle_count()
     }
 
-    pub fn render(&self, r: &mut Renderer, camera: &Camera, time: f32, ship: Option<&ShipView>) {
+    /// Culling + LOD + draw de un cuerpo esférico.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_body(
+        &self,
+        r: &mut Renderer,
+        name: &'static str,
+        lods: &[Mesh],
+        model: &Mat4,
+        center: Vec3,
+        bounding_radius: f32,
+        shader: &dyn Shader,
+        base: &Uniforms,
+    ) -> BodyReport {
+        let pixels = r.projected_radius_px(center, bounding_radius);
+        if self.culling_enabled && !r.sphere_visible(center, bounding_radius) {
+            r.stats.objects_culled += 1;
+            return BodyReport { name, lod: None, triangles: 0, pixels };
+        }
+        let lod = if self.lod_enabled { select_lod(pixels, lods.len()) } else { lods.len() - 1 };
+        let mesh = &lods[lod];
+        let u = Uniforms { model: *model, object_center: center, ..*base };
+        r.draw_mesh(mesh, model, shader, &u, DrawOptions::default());
+        BodyReport { name, lod: Some(lod), triangles: mesh.triangle_count(), pixels }
+    }
+
+    pub fn render(&self, r: &mut Renderer, camera: &Camera, time: f32, ship: Option<&ShipView>) -> Vec<BodyReport> {
         let view = camera.view();
         let proj = camera.projection(RENDER_W as f32 / RENDER_H as f32);
         r.begin_frame(view, proj, Vec3::new(0.01, 0.01, 0.035));
@@ -109,22 +153,18 @@ impl Scene {
             model: Mat4::IDENTITY,
             object_center: Vec3::ZERO,
         };
+        let mut report = Vec::with_capacity(self.planets.len() + 1);
 
         // --- Sol: rota despacio sobre su eje --------------------------------
-        let sun_model = Mat4::translation(sun_pos)
-            * Mat4::rotation_y(time * 0.05)
-            * Mat4::uniform_scale(SUN_RADIUS);
-        let u = Uniforms { model: sun_model, object_center: sun_pos, ..base };
-        r.draw_mesh(&self.sun_mesh, &sun_model, &self.sun_shader, &u, DrawOptions::default());
+        let sun_model = Mat4::translation(sun_pos) * Mat4::rotation_y(time * 0.05) * Mat4::uniform_scale(SUN_RADIUS);
+        report.push(self.draw_body(r, "Sol", &self.sun_lods, &sun_model, sun_pos, SUN_RADIUS, &self.sun_shader, &base));
 
-        // --- Planeta: órbita * inclinación del eje * rotación * escala -------
-        let planet_pos = Self::planet_pos(time);
-        let planet_model = Mat4::translation(planet_pos)
-            * Mat4::rotation_z(0.4)
-            * Mat4::rotation_y(time * TEST_PLANET_SPIN_SPEED)
-            * Mat4::uniform_scale(TEST_PLANET_RADIUS);
-        let u = Uniforms { model: planet_model, object_center: planet_pos, ..base };
-        r.draw_mesh(&self.planet_mesh, &planet_model, &self.planet_shader, &u, DrawOptions::default());
+        // --- Planetas -------------------------------------------------------
+        for p in &self.planets {
+            let model = p.model(time);
+            let center = p.position(time);
+            report.push(self.draw_body(r, p.def.name, &p.lods, &model, center, p.bounding_radius, p.shader.as_ref(), &base));
+        }
 
         // --- Nave -----------------------------------------------------------
         if let Some(sv) = ship.filter(|s| s.visible) {
@@ -150,6 +190,25 @@ impl Scene {
                 let opts = DrawOptions { double_sided: true, depth_write: false, additive: true };
                 r.draw_mesh(&self.flame_mesh, &flame_model, &draw, &u, opts);
             }
+        }
+        report
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lod_grows_with_screen_size() {
+        let n = LOD_SUBDIVISIONS.len();
+        assert_eq!(select_lod(1.0, n), 0);
+        assert_eq!(select_lod(f32::INFINITY, n), n - 1);
+        let mut prev = 0;
+        for px in [5.0, 20.0, 50.0, 100.0, 200.0, 400.0] {
+            let l = select_lod(px, n);
+            assert!(l >= prev);
+            prev = l;
         }
     }
 }

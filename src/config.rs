@@ -22,14 +22,14 @@ pub const SUN_RADIUS: f32 = 12.0;
 /// Velocidad de la animación de la superficie del sol.
 pub const SUN_ANIM_SPEED: f32 = 0.35;
 
-/// Planeta de prueba (paso 1 del proyecto).
-pub const TEST_PLANET_RADIUS: f32 = 7.0;
-pub const TEST_PLANET_ORBIT: f32 = 55.0;
-/// Radianes por segundo alrededor del sol.
-pub const TEST_PLANET_ORBIT_SPEED: f32 = 0.03;
-/// Radianes por segundo sobre su propio eje.
-pub const TEST_PLANET_SPIN_SPEED: f32 = 0.15;
-pub const TEST_PLANET_SUBDIV: u32 = 5;
+/// Niveles de detalle de los planetas: subdivisiones de la icosfera de cada
+/// nivel (320, 1280, 5120 y 20480 triángulos).
+pub const LOD_SUBDIVISIONS: [u32; 4] = [2, 3, 4, 5];
+/// Radio en pantalla (pixeles) a partir del cual se usa el siguiente nivel.
+pub const LOD_PIXEL_THRESHOLDS: [f32; 3] = [18.0, 55.0, 140.0];
+
+// Los parámetros de cada planeta (radio, órbita, semilla…) están en
+// `src/planets.rs`.
 
 /// Cámara libre de depuración (tecla F2).
 pub const FREEFLY_SPEED: f32 = 8.0;

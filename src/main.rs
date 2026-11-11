@@ -11,6 +11,8 @@ mod framebuffer;
 mod math;
 mod mesh;
 mod noise;
+mod planet;
+mod planets;
 mod renderer;
 mod scene;
 mod shader;
@@ -27,9 +29,10 @@ use renderer::Renderer;
 use scene::{Scene, ShipView};
 use ship::{Ship, ShipInput};
 
-/// Posición inicial: afuera de la órbita del planeta, mirando hacia el sol.
-fn spawn_ship() -> Ship {
-    let start = Vec3::new(0.0, 6.0, TEST_PLANET_ORBIT + 30.0);
+/// Posición inicial: afuera de la órbita más lejana, mirando hacia el sol.
+fn spawn_ship(scene: &Scene) -> Ship {
+    let outer = scene.planets.iter().map(|p| p.def.orbit.radius).fold(SUN_RADIUS * 3.0, f32::max);
+    let start = Vec3::new(0.0, 6.0, outer + 30.0);
     Ship::new(start, Vec3::ZERO - start)
 }
 
@@ -40,7 +43,7 @@ fn main() {
         return;
     }
 
-    let scene = match Scene::new() {
+    let mut scene = match Scene::new() {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Error cargando la escena: {e}");
@@ -64,7 +67,7 @@ fn main() {
     screen_tex.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_POINT);
 
     let mut renderer = Renderer::new(RENDER_W, RENDER_H);
-    let mut ship = spawn_ship();
+    let mut ship = spawn_ship(&scene);
     let mut ship_cam = ShipCamera::new();
     let mut free_cam: Option<FreeFly> = None;
     // Palanca virtual del mouse (x = guiñada, y = cabeceo), en [-1, 1].
@@ -90,8 +93,15 @@ fn main() {
             ship_cam.toggle();
         }
         if rl.is_key_pressed(KeyboardKey::KEY_R) {
-            ship = spawn_ship();
+            ship = spawn_ship(&scene);
             stick = (0.0, 0.0);
+        }
+        // F3 / F4: apagar culling o LOD para comparar los contadores.
+        if rl.is_key_pressed(KeyboardKey::KEY_F3) {
+            scene.culling_enabled = !scene.culling_enabled;
+        }
+        if rl.is_key_pressed(KeyboardKey::KEY_F4) {
+            scene.lod_enabled = !scene.lod_enabled;
         }
         if rl.is_key_pressed(KeyboardKey::KEY_F2) {
             // Cámara libre de depuración: arranca donde está la nave.
@@ -160,7 +170,7 @@ fn main() {
             boosting: ship.boosting,
             visible: free_cam.is_some() || ship_cam.mode == CameraMode::ThirdPerson,
         };
-        scene.render(&mut renderer, &camera, time, Some(&ship_view));
+        let bodies = scene.render(&mut renderer, &camera, time, Some(&ship_view));
 
         // --- Presentar -------------------------------------------------------
         screen_tex.update_texture(&renderer.fb.color).expect("update_texture");
@@ -228,8 +238,10 @@ fn main() {
         }
 
         if show_debug {
-            let lines = [
+            let onoff = |b: bool| if b { "ON" } else { "OFF" };
+            let mut lines = vec![
                 format!("FPS: {fps}"),
+                format!("Culling (F3): {}   LOD (F4): {}", onoff(scene.culling_enabled), onoff(scene.lod_enabled)),
                 format!("Objetos: {} dibujados / {} descartados", stats.objects_drawn, stats.objects_culled),
                 format!("Triangulos entrada: {}", stats.tris_in),
                 format!("  fuera del frustum: {}", stats.tris_frustum),
@@ -237,13 +249,19 @@ fn main() {
                 format!("  rasterizados:      {}", stats.tris_raster),
                 format!("Pixeles sombreados: {}", stats.pixels_shaded),
             ];
-            d.draw_rectangle(8, 8, 330, 24 + 22 * lines.len() as i32, Color::new(0, 0, 0, 150));
+            for b in &bodies {
+                lines.push(match b.lod {
+                    Some(l) => format!("  {}: LOD {} ({} tris, {:.0} px)", b.name, l, b.triangles, b.pixels.min(9999.0)),
+                    None => format!("  {}: fuera de vista", b.name),
+                });
+            }
+            d.draw_rectangle(8, 8, 400, 24 + 22 * lines.len() as i32, Color::new(0, 0, 0, 150));
             for (i, l) in lines.iter().enumerate() {
                 d.draw_text(l, 18, 18 + 22 * i as i32, 20, Color::RAYWHITE);
             }
         }
         d.draw_text(
-            "W/S acelerar/frenar | Mouse/flechas girar | A/D rodar | Espacio/Ctrl subir/bajar | Shift turbo | C camara | R reiniciar | Tab mouse | F1 debug | F2 camara libre",
+            "W/S acelerar/frenar | Mouse/flechas girar | A/D rodar | Espacio/Ctrl subir/bajar | Shift turbo | C camara | R reiniciar | Tab mouse | F1 debug | F2 libre | F3 culling | F4 LOD",
             12,
             sh as i32 - 26,
             16,
@@ -255,28 +273,39 @@ fn main() {
 /// Renderiza un cuadro sin abrir ventana y lo guarda como PPM. Sirve para
 /// capturas del README y para probar el pipeline sin interfaz.
 ///
-/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|cabina|nave]`
+/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|rasante|cabina|nave|choque] [--sin-culling] [--sin-lod]`
 fn snapshot(args: &[String]) {
     let time: f32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(10.0);
     let out = args.get(3).cloned().unwrap_or_else(|| "snapshot.ppm".into());
     let mode = args.get(4).map(String::as_str).unwrap_or("lejos");
-    let scene = Scene::new().expect("escena");
+    let mut scene = Scene::new().expect("escena");
+    // Para comparar el trabajo del renderer: --sin-culling / --sin-lod.
+    scene.culling_enabled = !args.iter().any(|a| a == "--sin-culling");
+    scene.lod_enabled = !args.iter().any(|a| a == "--sin-lod");
     let mut renderer = Renderer::new(RENDER_W, RENDER_H);
 
     // Se simula la nave volando unos segundos hacia el objetivo elegido.
-    let planet = Scene::planet_pos(time);
+    let p0 = &scene.planets[0];
+    let planet = p0.position(time);
+    let pr = p0.def.radius;
     let (start, target) = match mode {
         "cerca" | "cabina" => {
             let side = Vec3::new(0.3, 0.25, 1.0).normalize();
-            (planet + side * (TEST_PLANET_RADIUS + 4.0), planet + Vec3::new(-6.0, 0.0, 0.0))
+            (planet + side * (pr + 4.0), planet + Vec3::new(-6.0, 0.0, 0.0))
         }
         "nave" => (Vec3::new(0.0, 4.0, 80.0), Vec3::new(-20.0, 0.0, 0.0)),
+        // Pegado al terreno, mirando al horizonte: se ve el relieve.
+        "rasante" => {
+            let up = Vec3::new(0.35, 0.6, 1.0).normalize();
+            let tangent = up.cross(Vec3::Y).normalize();
+            (planet + up * (pr * 1.12 + 1.0), planet + up * (pr * 1.12) + tangent * 20.0)
+        }
         // Directo contra el planeta, con turbo: debe quedar rozando la superficie.
         "choque" => {
             let side = Vec3::new(0.2, 0.5, 1.0).normalize();
-            (planet + side * (TEST_PLANET_RADIUS + 12.0), planet)
+            (planet + side * (pr + 12.0), planet)
         }
-        _ => (Vec3::new(0.0, 10.0, TEST_PLANET_ORBIT + 25.0), Vec3::ZERO),
+        _ => (Vec3::new(0.0, 10.0, p0.def.orbit.radius + 25.0), Vec3::ZERO),
     };
     let mut ship = Ship::new(start, target - start);
     let input = ShipInput { thrust: 1.0, boost: mode == "choque", ..Default::default() };
@@ -307,7 +336,7 @@ fn snapshot(args: &[String]) {
     };
 
     let t0 = std::time::Instant::now();
-    scene.render(&mut renderer, &camera, time, Some(&view));
+    let bodies = scene.render(&mut renderer, &camera, time, Some(&view));
     let ms = t0.elapsed().as_secs_f32() * 1000.0;
 
     let mut ppm = format!("P6\n{} {}\n255\n", RENDER_W, RENDER_H).into_bytes();
@@ -316,6 +345,9 @@ fn snapshot(args: &[String]) {
     }
     std::fs::write(&out, ppm).expect("no se pudo escribir la captura");
     let alt = colliders.iter().map(|c| c.signed_distance(state.pos)).fold(f32::INFINITY, f32::min);
+    for b in &bodies {
+        println!("  {}: lod {:?}, {} tris, {:.0} px", b.name, b.lod, b.triangles, b.pixels);
+    }
     println!(
         "{out}: {ms:.1} ms, nave {} tris, distancia a superficie {alt:.2}, contacto '{}', stats = {:?}",
         scene.ship_triangles(),
