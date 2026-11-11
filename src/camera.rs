@@ -112,7 +112,7 @@ impl ShipCamera {
                 // a la superficie), se empuja hacia fuera.
                 for c in colliders {
                     let d = self.eye - c.center;
-                    let min = c.radius + CAM_SURFACE_MARGIN;
+                    let min = c.radius_toward(self.eye) + CAM_SURFACE_MARGIN;
                     if d.length() < min {
                         self.eye = c.center + d.normalize() * min;
                     }

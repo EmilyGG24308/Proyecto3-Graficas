@@ -362,6 +362,17 @@ impl Mat4 {
         )
     }
 
+    /// Transpuesta. Para una rotación pura es también su inversa.
+    pub fn transpose(&self) -> Mat4 {
+        let mut r = [[0.0f32; 4]; 4];
+        for (i, row) in r.iter_mut().enumerate() {
+            for (j, cell) in row.iter_mut().enumerate() {
+                *cell = self.m[j][i];
+            }
+        }
+        Mat4 { m: r }
+    }
+
     /// Posición (columna de traslación) de la matriz.
     pub fn translation_part(&self) -> Vec3 {
         Vec3::new(self.m[0][3], self.m[1][3], self.m[2][3])

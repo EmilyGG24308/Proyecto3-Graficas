@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn cannot_fly_through_planet() {
         use crate::collision::Collider;
-        let planet = Collider { center: Vec3::new(0.0, 0.0, -30.0), velocity: Vec3::ZERO, radius: 7.0, name: "p" };
+        let planet = Collider::sphere(Vec3::new(0.0, 0.0, -30.0), Vec3::ZERO, 7.0, "p");
         let mut ship = Ship::new(Vec3::ZERO, -Vec3::Z);
         // Turbo a fondo directo hacia el planeta durante 5 s.
         let input = ShipInput { thrust: 1.0, boost: true, ..Default::default() };

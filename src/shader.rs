@@ -91,3 +91,12 @@ pub fn rim(normal: Vec3, world_pos: Vec3, cam: Vec3) -> f32 {
     let v = (cam - world_pos).normalize();
     1.0 - normal.dot(v).clamp(0.0, 1.0)
 }
+
+/// Iluminación difusa "de caricatura" compartida por los planetas, para que
+/// todo el sistema tenga la misma dirección artística: dos escalones suaves
+/// (sombra / media luz / luz) en vez de un degradado continuo.
+#[inline]
+pub fn toon_diffuse(d: f32, ambient: f32) -> f32 {
+    use crate::math::smoothstep;
+    ambient + (0.6 - ambient) * smoothstep(0.0, 0.08, d) + 0.4 * smoothstep(0.35, 0.45, d)
+}

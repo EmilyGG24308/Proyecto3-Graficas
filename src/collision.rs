@@ -1,18 +1,29 @@
-//! Colisión básica: la nave (una esfera pequeña) contra cuerpos esféricos
-//! (planetas y sol) que pueden estar moviéndose en su órbita.
+//! Colisión básica: la nave (una esfera pequeña) contra cuerpos sólidos
+//! (planetas con relieve y el sol) que pueden estar moviéndose en su órbita.
 
-use crate::math::Vec3;
+use crate::math::{Mat4, Vec3};
+use crate::planet::Planet;
+
+/// Forma de la superficie de un cuerpo.
+#[derive(Clone, Copy)]
+pub enum Surface<'a> {
+    /// Esfera perfecta de este radio.
+    Sphere(f32),
+    /// Terreno de un planeta: el radio depende de la dirección.
+    /// `inv_rotation` lleva direcciones de mundo al espacio local del planeta
+    /// (es la transpuesta de su rotación actual).
+    Terrain { planet: &'a Planet, inv_rotation: Mat4 },
+}
 
 /// Un cuerpo sólido con el que la nave puede chocar.
-#[derive(Clone, Copy, Debug)]
-pub struct Collider {
+#[derive(Clone, Copy)]
+pub struct Collider<'a> {
     pub center: Vec3,
     /// Velocidad del cuerpo (los planetas orbitan): el rebote se calcula
     /// relativo a ella para que la nave no se "hunda" en un planeta que la
     /// alcanza por detrás.
     pub velocity: Vec3,
-    /// Radio de la superficie sólida.
-    pub radius: f32,
+    pub surface: Surface<'a>,
     /// Nombre para el HUD.
     pub name: &'static str,
 }
@@ -24,10 +35,26 @@ pub struct Contact {
     pub impact_speed: f32,
 }
 
-impl Collider {
+impl<'a> Collider<'a> {
+    pub fn sphere(center: Vec3, velocity: Vec3, radius: f32, name: &'static str) -> Self {
+        Self { center, velocity, surface: Surface::Sphere(radius), name }
+    }
+
+    /// Radio de la superficie justo debajo del punto `p` (en mundo).
+    pub fn radius_toward(&self, p: Vec3) -> f32 {
+        match self.surface {
+            Surface::Sphere(r) => r,
+            Surface::Terrain { planet, inv_rotation } => {
+                let dir_local = inv_rotation.transform_dir((p - self.center).normalize());
+                planet.surface_radius_local(dir_local)
+            }
+        }
+    }
+
     /// Distancia de un punto a la superficie (negativa si está dentro).
+    /// Se mide a lo largo de la vertical (dirección al centro).
     pub fn signed_distance(&self, p: Vec3) -> f32 {
-        (p - self.center).length() - self.radius
+        (p - self.center).length() - self.radius_toward(p)
     }
 
     /// Empuja una esfera de radio `r` (centro `pos`, velocidad `vel`) fuera
@@ -37,7 +64,7 @@ impl Collider {
     pub fn resolve(&self, pos: &mut Vec3, vel: &mut Vec3, r: f32, restitution: f32, friction: f32) -> Option<Contact> {
         let d = *pos - self.center;
         let dist = d.length();
-        let min = self.radius + r;
+        let min = self.radius_toward(*pos) + r;
         if dist >= min {
             return None;
         }
@@ -65,7 +92,7 @@ mod tests {
 
     #[test]
     fn pushes_out_and_bounces() {
-        let c = Collider { center: Vec3::ZERO, velocity: Vec3::ZERO, radius: 5.0, name: "p" };
+        let c = Collider::sphere(Vec3::ZERO, Vec3::ZERO, 5.0, "p");
         let mut pos = Vec3::new(0.0, 0.0, 5.1);
         let mut vel = Vec3::new(1.0, 0.0, -10.0);
         let hit = c.resolve(&mut pos, &mut vel, 0.5, 0.2, 0.1).unwrap();
@@ -78,7 +105,7 @@ mod tests {
     #[test]
     fn moving_planet_carries_ship() {
         // El planeta viene hacia la nave a 3 u/s; la nave está quieta.
-        let c = Collider { center: Vec3::ZERO, velocity: Vec3::new(0.0, 0.0, 3.0), radius: 5.0, name: "p" };
+        let c = Collider::sphere(Vec3::ZERO, Vec3::new(0.0, 0.0, 3.0), 5.0, "p");
         let mut pos = Vec3::new(0.0, 0.0, 5.2);
         let mut vel = Vec3::ZERO;
         c.resolve(&mut pos, &mut vel, 0.5, 0.0, 0.0);
