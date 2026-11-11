@@ -273,7 +273,7 @@ fn main() {
 /// Renderiza un cuadro sin abrir ventana y lo guarda como PPM. Sirve para
 /// capturas del README y para probar el pipeline sin interfaz.
 ///
-/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|rasante|cabina|nave|choque] [--sin-culling] [--sin-lod] [--planeta N]`
+/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|rasante|cabina|nave|choque] [--sin-culling] [--sin-lod] [--planeta N] [--bench]`
 fn snapshot(args: &[String]) {
     let time: f32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(10.0);
     let out = args.get(3).cloned().unwrap_or_else(|| "snapshot.ppm".into());
@@ -346,6 +346,19 @@ fn snapshot(args: &[String]) {
     let t0 = std::time::Instant::now();
     let bodies = scene.render(&mut renderer, &camera, time, Some(&view));
     let ms = t0.elapsed().as_secs_f32() * 1000.0;
+
+    // --bench: repite el cuadro 60 veces y mide promedio y peor caso.
+    if args.iter().any(|a| a == "--bench") {
+        let mut times = Vec::with_capacity(60);
+        for i in 0..60 {
+            let t = std::time::Instant::now();
+            scene.render(&mut renderer, &camera, time + i as f32 / 60.0, Some(&view));
+            times.push(t.elapsed().as_secs_f32() * 1000.0);
+        }
+        let avg = times.iter().sum::<f32>() / times.len() as f32;
+        let max = times.iter().copied().fold(0.0, f32::max);
+        println!("BENCH {mode}: promedio {avg:.2} ms ({:.0} FPS), peor {max:.2} ms", 1000.0 / avg);
+    }
 
     let mut ppm = format!("P6\n{} {}\n255\n", RENDER_W, RENDER_H).into_bytes();
     for px in renderer.fb.color.chunks_exact(4) {

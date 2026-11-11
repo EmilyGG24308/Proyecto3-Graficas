@@ -20,7 +20,10 @@ cargo run --release -- --snapshot 10 out.ppm cerca   # captura sin ventana
 ```
 
 Modos de captura: `lejos`, `cerca`, `rasante`, `cabina`, `nave`, `choque`.
-Opciones: `--sin-culling`, `--sin-lod` (para comparar contadores).
+Opciones: `--sin-culling`, `--sin-lod` (para comparar contadores),
+`--planeta N` (a qué planeta acercarse), `--bench` (repite el cuadro 60 veces
+y muestra el tiempo promedio y el peor). **Midan su planeta con `--bench`**:
+de cerca debería quedar por debajo de ~10 ms en una Mac M-series.
 `sips -s format png out.ppm --out out.png` la convierte a PNG en macOS.
 
 **Siempre en `--release`**: en debug el renderer es ~20x más lento.
