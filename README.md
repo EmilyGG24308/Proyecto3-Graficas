@@ -70,8 +70,3 @@ cargo run --release
 | `src/shaders/` | Fragment shaders: sol, jungla, embrujado, toon (nave y objetos), flama, fantasma |
 | `assets/models/nave_cohete.py` | Script de Blender que genera la nave |
 | `assets/models/modelos_superficie.py` | Script de Blender: palmera, helecho, esqueleto, árbol seco, lápida, casona, fantasma |
-
-## Uso de IA
-
-Parte del código se escribió con asistencia de Claude (Anthropic) y de IA de OpenAI para los mundos de Esteban. Todo el
-equipo revisó y debe poder explicar el código entregado.
