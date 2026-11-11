@@ -1,0 +1,192 @@
+# Pendientes del Proyecto 3 (para Esteban y Emily)
+
+Este archivo dice qué falta, cuántos puntos da y **cómo hacerlo con el código
+que ya existe**. La rúbrica completa está en `PROYECTO_FINAL GRAFICAS 2026.pdf`.
+
+> Regla de oro de la rúbrica: todo el 3D es nuestro. raylib solo abre la
+> ventana, lee teclado/mouse, muestra el framebuffer y dibuja texto 2D.
+> **No usen** `draw_model`, `Camera3D`, `draw_sphere`, shaders GPU, etc.
+
+---
+
+## 1. Cómo correr y probar
+
+Requisitos: Rust (stable) y `cmake` (`brew install cmake` en macOS).
+
+```bash
+cargo run --release                      # el juego
+cargo test --release                     # 16 tests (matemática, física, colisión, LOD…)
+cargo run --release -- --snapshot 10 out.ppm cerca   # captura sin ventana
+```
+
+Modos de captura: `lejos`, `cerca`, `rasante`, `cabina`, `nave`, `choque`.
+Opciones: `--sin-culling`, `--sin-lod` (para comparar contadores).
+`sips -s format png out.ppm --out out.png` la convierte a PNG en macOS.
+
+**Siempre en `--release`**: en debug el renderer es ~20x más lento.
+
+---
+
+## 2. Puntos: hecho vs. pendiente
+
+| Característica | Pts | Estado | Dónde |
+|---|---|---|---|
+| Planeta 1 (Bosque) | 10 | ✅ | `planets.rs`, `shaders/forest.rs` |
+| Planetas 2–5 (ciudad, lava, hielo, desierto) | 40 | ⬜ | ver §3 |
+| 4 shaders distintos (sol, bosque, toon, flama) | 24 | ✅ | `src/shaders/` |
+| Shader animado (sol, flama) | 8 | ✅ | `sun.rs`, `thruster.rs` |
+| Deformación del planeta con ruido | 10 | ✅ | `planet.rs` → `build_terrain_mesh` |
+| Generación/subdivisión de geometría (icosfera) | 10 | ✅ | `mesh.rs` → `icosphere` |
+| Normal mapping | 8 | ⬜ | ver §6 |
+| Tipos de modelo sobre planetas (4 × 5) | 20 | ⬜ | ver §4 |
+| Distribución procedural con semilla | 10 | ⬜ | ver §4 |
+| Posición/orientación sobre superficie curva | 5 | ⬜ | ver §4 |
+| Aceleración/frenado/giro progresivos (FPS-independiente) | 8 | ✅ | `ship.rs` (test `same_result_at_30_and_144_fps`) |
+| Colisión con el planeta | 4 | ✅ | `collision.rs` (usa la altura real del terreno) |
+| Modo de control local para rodear un planeta | 8 | ⬜ | ver §5 |
+| Gravedad que modifica la trayectoria | 10 | ⬜ | ver §5 |
+| Culling de objetos fuera de la vista | 7 | ✅ | `scene.rs` → `draw_body`, tecla F3 |
+| LOD por distancia | 8 | ✅ | `scene.rs` → `select_lod`, tecla F4 |
+| Coherencia visual + claridad (presentación) | 10 | 🟡 | se cierra con el video y el README |
+
+**Hecho: 89 puntos técnicos** (+ hasta 10 de presentación).
+Con 2 planetas más ya pasamos de 100; el resto es margen por si el profesor
+da fracciones de algún punto.
+
+Comparación ya medida (para la presentación):
+- LOD: vista lejana = **2 988** triángulos de entrada; con `--sin-lod` = **26 988**.
+- Culling: cerca del bosque con el sol fuera de vista = **6 508**; con `--sin-culling` = **11 628**.
+
+---
+
+## 3. Agregar un planeta (≈ 30 min cada uno)
+
+1. Copiar `src/shaders/forest.rs` como `src/shaders/lava.rs` (por ejemplo) y
+   cambiar el efecto. Registrarlo en `src/shaders/mod.rs`.
+2. En `src/planets.rs` hay una plantilla comentada `fn lava()`. Llenarla y
+   agregarla a `solar_system()`.
+
+Eso es todo: órbita, rotación, colisión, LOD, culling y HUD funcionan solos.
+
+**Importante para la rúbrica:** "cambiar solo el color no cuenta". Cada
+planeta necesita identidad propia y cada shader una *implementación*
+distinta. Ideas que ya combinan con lo que hay:
+
+| Planeta | Terreno (`Terrain`) | Shader (idea) |
+|---|---|---|
+| Lava | `Ridged`, amplitud ~0.12, sin mar | grietas brillantes con `ridged` + pulso animado (`u.time`); roca oscura con toon |
+| Hielo/océano | `Smooth`, mar alto (`sea_level: Some(0.1)`) | agua con olas animadas (ruido desplazado con el tiempo) + especular; casquetes por latitud (`local_pos.y`) |
+| Ciudad | casi plano (amplitud 0.03) | cuadrícula de calles (`fract` sobre coordenadas esféricas), ventanas que se encienden en el lado nocturno (`lambert < 0.1`) |
+| Desierto | `Smooth`, frecuencia alta | dunas con bandas (`sin` de una coordenada + ruido); + anillo de asteroides (mesh plano `double_sided`) |
+
+En un shader tienen a mano (`Varyings`): `world_pos`, `normal`, `local_pos`
+(posición en la esfera unitaria deformada → la altura es `local_pos.length() - 1`),
+`uv`, `color`. Y en `Uniforms`: `time`, `camera_pos`, `sun_pos`.
+Funciones útiles en `shader.rs`: `lambert`, `blinn_phong`, `rim`, `toon_diffuse`.
+
+Para la demo, el profesor puede pedir cambiar **radio, velocidad orbital,
+semilla o intensidad de un shader**: todo está en `PlanetDef` y en los campos
+de cada shader en `planets.rs`.
+
+---
+
+## 4. Modelos sobre la superficie (hasta 35 pts)
+
+**Modelos (5 pts por tipo, máx. 4):** árbol, edificio, roca/arco, cristal…
+Deben ser hechos por nosotros. Lo más rápido: un script de Blender como
+`assets/models/nave_cohete.py` (se ejecuta con
+`/Applications/Blender.app/Contents/MacOS/Blender -b -P assets/models/arbol.py`)
+que exporte `.obj` + `.mtl`. Los colores salen del `Kd` de cada material y
+`mesh::load_obj` ya los lee. Mantenerlos chicos (100–600 triángulos).
+Se pueden dibujar con el `ToonShader` que ya existe.
+
+**Distribución procedural con semilla (10 pts):** NO poner posiciones a mano.
+Ejemplo:
+
+```rust
+let mut rng = Rng::new(planet.def.seed);          // misma semilla → mismas posiciones
+for _ in 0..N {
+    // dirección uniforme en la esfera
+    let z = rng.range(-1.0, 1.0);
+    let a = rng.range(0.0, std::f32::consts::TAU);
+    let r = (1.0 - z * z).sqrt();
+    let dir = Vec3::new(r * a.cos(), z, r * a.sin());
+    // filtrar con ruido (ej.: bosques solo donde fbm > 0.1 y no en el agua)
+    if planet.noise.fbm(dir * 3.0, 3) < 0.1 { continue; }
+    instancias.push(dir);
+}
+```
+
+**Posición y orientación sobre la superficie curva (5 pts):** guardar cada
+instancia en espacio LOCAL del planeta y multiplicar por la matriz del planeta
+en cada cuadro, así rotan con él:
+
+```rust
+let p = planet.surface_point_local(dir);            // punto sobre el terreno (radio ~1)
+let up = dir.normalize();                           // "arriba" = normal de la esfera
+let right = up.cross(Vec3::Y).normalize();          // cuidado si up ≈ Y: usar Vec3::X
+let fwd = right.cross(up);
+let local = Mat4::translation(p)
+          * Mat4::from_basis(right, up, fwd)
+          * Mat4::uniform_scale(escala / planet.def.radius); // el planeta ya escala por su radio
+let model = planet.model(time) * local;
+renderer.draw_mesh(&arbol, &model, &toon, &uniforms, DrawOptions::default());
+```
+
+Para rendimiento: aplicar `renderer.sphere_visible(...)` a cada instancia (o al
+planeta entero) antes de dibujarla, igual que `Scene::draw_body`.
+
+---
+
+## 5. Navegación que falta (18 pts)
+
+Todo va en `src/ship.rs` → `Ship::step` (corre a 120 Hz fijos; usar `dt` de
+ahí para que siga siendo independiente de los FPS).
+
+**Gravedad (10 pts):** `step` ya recibe `colliders` (posición y radio de cada
+cuerpo). Agregar antes de integrar la velocidad:
+
+```rust
+for c in colliders {
+    let d = c.center - s.pos;
+    let r2 = d.length_sq().max(1.0);
+    accel += d.normalize() * (G * masa(c) / r2);   // masa ∝ radio³, G en config.rs
+}
+```
+
+Que se note pero no impida volar: probar G pequeño y mostrarlo en la demo
+soltando la nave cerca del planeta (cae y choca suavemente).
+
+**Modo órbita (8 pts), tecla `O`:** al activarlo cerca de un planeta, la
+nave mantiene una altura constante y A/D (o el mouse) la hacen dar la vuelta
+alrededor sin cortar el vuelo. Idea: guardar el planeta objetivo y la altura;
+en cada paso, proyectar la velocidad sobre el plano tangente
+(`vel -= n * vel.dot(n)` con `n` = dirección desde el centro), corregir la
+altura con un resorte suave, y re-orientar `up` hacia `n`. Mostrar en el HUD
+"MODO ÓRBITA: Bosque". Al presionar `O` otra vez vuelve el vuelo libre.
+
+---
+
+## 6. Normal mapping (8 pts)
+
+Tiene que estar en nuestro renderer. Opción sencilla y válida: mapa de
+normales **procedural** en un shader (ej. dunas del desierto o roca de lava):
+
+1. Construir la base tangente en el fragmento: `n` (normal), `t = n.cross(Y)`
+   normalizado, `b = n.cross(t)`.
+2. Leer la "textura" de normales: derivadas del ruido por diferencias finitas,
+   `dx = h(p + e*t) - h(p - e*t)`, `dy = h(p + e*b) - h(p - e*b)`.
+3. Normal perturbada: `n' = normalize(n - t*dx*k - b*dy*k)` y usarla en la
+   iluminación. `k` = intensidad (parámetro para la demo).
+
+Mostrar con una tecla que lo apague/encienda para que se vea la diferencia.
+
+---
+
+## 7. Entrega
+
+- **README.md**: completar integrantes, contribuciones de cada quien, lista de
+  puntos solicitados y dónde se ven (la tabla de §2 sirve), uso de IA.
+- **Video**: vuelo espacial → acercamiento → vuelta alrededor de un planeta →
+  alejamiento. Activar F1 un momento y mostrar F3/F4 cambiando los contadores.
+- Cada integrante debe poder explicar su parte en vivo.
