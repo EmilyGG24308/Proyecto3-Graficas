@@ -1,7 +1,8 @@
 use std::f32::consts::TAU;
 
 use crate::config::WORLD_SEED;
-use crate::math::{Mat4, Vec3, smoothstep};
+use crate::math::{Mat4, Vec2, Vec3, smoothstep};
+use crate::mesh::{self, Mesh};
 use crate::noise::{Perlin, Rng};
 use crate::planet::{Orbit, Planet, PlanetDef, Terrain, TerrainKind};
 use crate::planets::model;
@@ -115,11 +116,15 @@ impl Shader for MecanicoShader {
         let bandas = (dir.x * 14.0).sin().abs()
             .min((dir.y * 14.0).sin().abs())
             .min((dir.z * 14.0).sin().abs());
-        let union = 1.0 - smoothstep(0.06, 0.19, bandas);
+        let union = if v.color.x < 0.99 { 0.0 } else { 1.0 - smoothstep(0.06, 0.19, bandas) };
         let panel = Vec3::new(0.24, 0.34, 0.40).lerp(
             Vec3::new(0.44, 0.53, 0.56), smoothstep(-0.4, 0.5, altura),
         );
-        let metal = panel.lerp(Vec3::new(0.08, 0.16, 0.20), union * 0.8);
+        let metal = if v.color.x < 0.99 {
+            v.color
+        } else {
+            panel.lerp(Vec3::new(0.08, 0.16, 0.20), union * 0.8)
+        };
         let pulso = 0.65 + 0.35 * (u.time * 1.5 + dir.y * 6.0).sin();
         let borde = smoothstep(0.6, 1.0, rim(normal, v.world_pos, u.camera_pos));
         metal * toon_diffuse(luz, 0.22)
@@ -142,7 +147,66 @@ fn mecanico() -> Result<Planet, String> {
             placement: Placement::Scatter, scale: (0.75, 1.3), height: (-1.0, 1.0),
             density_frequency: 2.5, density_threshold: -0.08, max_slope: 0.35, sink: 0.05, max_tilt: 0.04 },
     ];
-    Ok(Planet::new(def, Box::new(MecanicoShader { amplitud: terreno.amplitude })).with_props(objetos))
+    let mut planeta = Planet::new(def, Box::new(MecanicoShader { amplitud: terreno.amplitude })).with_props(objetos);
+    let carcasa = carcasa_mecanica(&planeta);
+    // La carcasa se añade a todos los LOD para que se lea también de lejos.
+    for lod in &mut planeta.lods {
+        append_transformed(lod, &carcasa, &Mat4::IDENTITY);
+        lod.compute_bounding_radius();
+        planeta.bounding_radius = planeta.bounding_radius.max(lod.bounding_radius * def.radius);
+    }
+    Ok(planeta)
+}
+
+// Cada cara de la icosfera produce una pieza con volumen y bordes separados.
+fn carcasa_mecanica(planeta: &Planet) -> Mesh {
+    let base = mesh::icosphere(1);
+    let mut carcasa = Mesh::default();
+    for (indice, cara) in base.indices.iter().enumerate() {
+        let a = base.positions[cara[0] as usize];
+        let b = base.positions[cara[1] as usize];
+        let c = base.positions[cara[2] as usize];
+        let centro = (a + b + c).normalize();
+        let esquinas = [a, b, c].map(|p| (p * 0.88 + centro * 0.12).normalize());
+        let contorno = [
+            esquinas[0], (esquinas[0] + esquinas[1]).normalize(),
+            esquinas[1], (esquinas[1] + esquinas[2]).normalize(),
+            esquinas[2], (esquinas[2] + esquinas[0]).normalize(),
+        ];
+        let punto = |dir: Vec3, extra: f32| {
+            dir * (1.0 + planeta.def.terrain.height(&planeta.noise, dir) + extra)
+        };
+        let color = match indice % 5 {
+            0 => Vec3::new(0.67, 0.42, 0.17),
+            1 => Vec3::new(0.35, 0.47, 0.50),
+            _ => Vec3::new(0.25, 0.36, 0.40),
+        };
+        for i in 0..6 {
+            let siguiente = (i + 1) % 6;
+            let superior = punto(contorno[i], 0.035);
+            let superior_sig = punto(contorno[siguiente], 0.035);
+            let inferior = punto(contorno[i], 0.005);
+            let inferior_sig = punto(contorno[siguiente], 0.005);
+            agregar_triangulo(&mut carcasa, [punto(centro, 0.035), superior, superior_sig], color);
+            agregar_triangulo(&mut carcasa, [superior, inferior, inferior_sig], color * 0.55);
+            agregar_triangulo(&mut carcasa, [superior, inferior_sig, superior_sig], color * 0.55);
+        }
+    }
+    carcasa.compute_bounding_radius();
+    carcasa
+}
+
+fn agregar_triangulo(malla: &mut Mesh, puntos: [Vec3; 3], color: Vec3) {
+    let inicio = malla.positions.len() as u32;
+    let normal = (puntos[1] - puntos[0]).cross(puntos[2] - puntos[0]).normalize();
+    for punto in puntos {
+        malla.positions.push(punto);
+        malla.normals.push(normal);
+        malla.uvs.push(Vec2::default());
+        malla.colors.push(color);
+        malla.emissive.push(0.0);
+    }
+    malla.indices.push([inicio, inicio + 1, inicio + 2]);
 }
 
 struct CristalinoShader {
@@ -266,6 +330,8 @@ mod pruebas {
         assert_eq!(a[2].def.orbit.radius, 145.0);
         assert_eq!(a[3].def.orbit.radius, 170.0);
         assert_ne!(a[2].def.seed, a[3].def.seed);
+        assert!(a[2].lods[0].triangle_count() > mesh::icosphere(2).triangle_count());
+        assert_eq!(a[2].lods[0].positions, b[2].lods[0].positions);
         for (primero, segundo) in a.iter().zip(&b) {
             let objetos = primero.props.as_ref().unwrap();
             assert_eq!(objetos.mesh.positions, segundo.props.as_ref().unwrap().mesh.positions);
