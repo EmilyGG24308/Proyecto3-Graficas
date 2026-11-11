@@ -1,0 +1,5 @@
+/target
+.DS_Store
+*.blend1
+*.ppm
+/capturas/tmp/
