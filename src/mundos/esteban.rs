@@ -9,7 +9,7 @@ use crate::props::{Placement, PropSpec, append_transformed};
 use crate::shader::{Shader, Uniforms, Varyings, lambert, rim, toon_diffuse};
 
 pub fn planetas() -> Result<Vec<Planet>, String> {
-    Ok(vec![lava()?, desierto()?])
+    Ok(vec![lava()?, desierto()?, mecanico()?])
 }
 
 // Ruido celular con hash entero: evita calcular senos en las 27 celdas
@@ -101,6 +101,50 @@ impl Shader for DesiertoShader {
     }
 }
 
+struct MecanicoShader {
+    amplitud: f32,
+}
+
+impl Shader for MecanicoShader {
+    fn fragment(&self, v: &Varyings, u: &Uniforms) -> Vec3 {
+        let dir = v.local_pos.normalize();
+        let altura = (v.local_pos.length() - 1.0) / self.amplitud;
+        let normal = v.normal.normalize();
+        let luz = lambert(normal, v.world_pos, u.sun_pos);
+        // Tres familias de bandas envuelven la esfera sin costura en los polos.
+        let bandas = (dir.x * 14.0).sin().abs()
+            .min((dir.y * 14.0).sin().abs())
+            .min((dir.z * 14.0).sin().abs());
+        let union = 1.0 - smoothstep(0.06, 0.19, bandas);
+        let panel = Vec3::new(0.24, 0.34, 0.40).lerp(
+            Vec3::new(0.44, 0.53, 0.56), smoothstep(-0.4, 0.5, altura),
+        );
+        let metal = panel.lerp(Vec3::new(0.08, 0.16, 0.20), union * 0.8);
+        let pulso = 0.65 + 0.35 * (u.time * 1.5 + dir.y * 6.0).sin();
+        let borde = smoothstep(0.6, 1.0, rim(normal, v.world_pos, u.camera_pos));
+        metal * toon_diffuse(luz, 0.22)
+            + Vec3::new(0.05, 0.80, 1.0) * (union * pulso * 0.42 + borde * 0.20)
+    }
+}
+
+fn mecanico() -> Result<Planet, String> {
+    let terreno = Terrain { kind: TerrainKind::Smooth, amplitude: 0.035, frequency: 2.0, octaves: 3, sea_level: None };
+    let def = PlanetDef {
+        name: "Mecanico", radius: 6.5,
+        orbit: Orbit { radius: 145.0, speed: 0.012, phase: 0.9, inclination: 0.03 },
+        spin_speed: 0.10, axial_tilt: 0.18, seed: WORLD_SEED + 22, terrain: terreno,
+    };
+    let objetos = vec![
+        PropSpec { name: "Engranajes", mesh: model("mecanico_engranaje")?, count: 45,
+            placement: Placement::Scatter, scale: (0.7, 1.2), height: (-1.0, 1.0),
+            density_frequency: 2.3, density_threshold: -0.10, max_slope: 0.35, sink: 0.05, max_tilt: 0.04 },
+        PropSpec { name: "Antenas", mesh: model("mecanico_antena")?, count: 35,
+            placement: Placement::Scatter, scale: (0.75, 1.3), height: (-1.0, 1.0),
+            density_frequency: 2.5, density_threshold: -0.08, max_slope: 0.35, sink: 0.05, max_tilt: 0.04 },
+    ];
+    Ok(Planet::new(def, Box::new(MecanicoShader { amplitud: terreno.amplitude })).with_props(objetos))
+}
+
 fn lava() -> Result<Planet, String> {
     let terreno = Terrain { kind: TerrainKind::Ridged, amplitude: 0.12, frequency: 2.0, octaves: 5, sea_level: None };
     let def = PlanetDef {
@@ -170,7 +214,7 @@ mod pruebas {
     fn mundos_y_anillo_son_reproducibles_y_quedan_en_el_limite() {
         let a = planetas().unwrap();
         let b = planetas().unwrap();
-        assert_eq!(a.len(), 2);
+        assert_eq!(a.len(), 3);
         for (primero, segundo) in a.iter().zip(&b) {
             let objetos = primero.props.as_ref().unwrap();
             assert_eq!(objetos.mesh.positions, segundo.props.as_ref().unwrap().mesh.positions);
