@@ -41,12 +41,12 @@ de cerca debería quedar por debajo de ~10 ms en una Mac M-series.
 | Planeta 1: Jungla jurásica | 10 | ✅ | `planets.rs`, `shaders/jungle.rs` |
 | Planeta 2: Embrujado | 10 | ✅ | `planets.rs`, `shaders/haunted.rs` |
 | Planetas 3–4: Lava y Desierto (Esteban) | 20 | ✅ | `src/mundos/esteban.rs` |
-| Planetas 5–6: Ciudad y Hielo (Emily) | 10 (máx. 5 planetas puntúan) | ✅ | `src/mundos/emily.rs`, `assets/models/modelos_emily.py` |
+| Planetas 5–6: Ciudad y Hielo (Emily) | 10 (máx. 5 planetas puntúan) | ✅ | `src/mundos/emily/`, `assets/models/modelos_emily.py` |
 | 4 shaders distintos (ya hay 6: sol, jungla, embrujado, toon, flama, fantasma) | 24 | ✅ | `src/shaders/` |
 | Shader animado (sol, flama, lava de la jungla, niebla del embrujado) | 8 | ✅ | `sun.rs`, `thruster.rs`, `jungle.rs`, `haunted.rs` |
 | Deformación del planeta con ruido | 10 | ✅ | `planet.rs` → `build_terrain_mesh` |
 | Generación/subdivisión de geometría (icosfera) | 10 | ✅ | `mesh.rs` → `icosphere` |
-| Normal mapping | 8 | 🟡 normal map procedural en las olas del Hielo (campo `olas`, 0 = apagado); falta la tecla para alternarlo, que requiere tocar `main.rs` (Martin) | `src/mundos/emily.rs` → `HieloShader::mar`, ver §6 |
+| Normal mapping | 8 | 🟡 normal map procedural en las olas del Hielo (campo `olas`, 0 = apagado); falta la tecla para alternarlo, que requiere tocar `main.rs` (Martin) | `src/mundos/emily/hielo.rs` → `HieloShader::mar`, ver §6 |
 | Tipos de modelo sobre planetas (4 × 5) — ya hay 7: palmera, helecho, esqueleto de dino, árbol seco, lápida, casona, fantasma | 20 | ✅ | `assets/models/modelos_superficie.py` |
 | Distribución procedural con semilla | 10 | ✅ | `src/props.rs` → `place` (tests `same_seed_same_positions…`) |
 | Posición/orientación sobre superficie curva | 5 | ✅ | `src/props.rs` → `instance_matrix` |

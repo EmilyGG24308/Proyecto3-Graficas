@@ -36,7 +36,7 @@ ventana, la entrada y mostrar el framebuffer.
 |---|---|---|
 | Martin Villatoro | 24033 | Pipeline de rasterización, nave y física, colisiones, planetas/LOD/culling |
 | Esteban de la Peña | 24171 | Planetas Lava, Desierto, Mecánico y Cristalino, shaders, modelos y anillo de asteroides (`src/mundos/esteban.rs`) |
-| Emily Góngora | 24308 | Planetas Ciudad y Hielo / océano: shaders (cuadrícula de calles por proyección de cubo, tráfico y luces nocturnas; olas con normal mapping procedural, espuma, casquetes y aurora), distribución de edificios en la cuadrícula y colonias de pingüinos, modelos (`src/mundos/emily.rs`, `assets/models/modelos_emily.py`) |
+| Emily Góngora | 24308 | Planetas Ciudad y Hielo / océano: shaders (cuadrícula de calles por proyección de cubo, tráfico y luces nocturnas; olas con normal mapping procedural, espuma, casquetes y aurora), distribución de edificios en la cuadrícula y colonias de pingüinos, modelos (`src/mundos/emily/`, `assets/models/modelos_emily.py`) |
 
 ## Cómo ejecutar
 
@@ -83,6 +83,6 @@ cargo run --release
 
 - **Emily Góngora:** usé un asistente de IA (Claude) como apoyo para escribir
   el código de los planetas Ciudad y Hielo (shaders y reglas de colocación en
-  `src/mundos/emily.rs`), el script de modelos `assets/models/modelos_emily.py`
+  `src/mundos/emily/`), el script de modelos `assets/models/modelos_emily.py`
   y para iterar el aspecto con capturas y `--bench`. Revisé, probé y puedo
   explicar todo el código entregado.
