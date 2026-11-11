@@ -211,3 +211,30 @@ m = Modelo("desierto_asteroide")
 m.esfera((0, 0, 0.45), (0.85, 0.62, 0.45), 8, 5, "Asteroide")
 m.cono((0.28, 0.05, 0.7), 0.34, 0.08, 0.38, 5, "Arenisca", rot=rot_y(22))
 m.exportar()
+
+# Engranaje de bronce sobre un pedestal, con diez dientes visibles.
+material("Metal", (0.30, 0.40, 0.46))
+material("MetalOscuro", (0.12, 0.18, 0.23))
+material("Bronce", (0.80, 0.47, 0.16))
+material("Energia", (0.12, 0.92, 1.0), emisivo=True)
+
+m = Modelo("mecanico_engranaje")
+m.cono((0, 0, 0.12), 0.38, 0.38, 0.24, 8, "MetalOscuro")
+m.cono((0, 0, 0.45), 0.25, 0.25, 0.50, 8, "Metal")
+m.cono((0, 0, 0.78), 0.62, 0.62, 0.16, 10, "Bronce")
+for k in range(10):
+    a = 2 * math.pi * k / 10
+    m.caja((0.66 * math.cos(a), 0.66 * math.sin(a), 0.78), (0.26, 0.22, 0.16), "Bronce", rot=rot_z(math.degrees(a)))
+m.cono((0, 0, 0.89), 0.19, 0.19, 0.08, 8, "Energia")
+m.exportar()
+
+# Antena de comunicaciones con brazos y una luz en la punta.
+m = Modelo("mecanico_antena")
+m.cono((0, 0, 0.10), 0.36, 0.28, 0.20, 8, "MetalOscuro")
+m.cono((0, 0, 0.78), 0.15, 0.10, 1.16, 8, "Metal")
+m.cono((0, 0, 1.43), 0.20, 0.20, 0.14, 8, "Bronce")
+for lado in (-1, 1):
+    m.caja((lado * 0.32, 0, 0.90), (0.48, 0.12, 0.12), "MetalOscuro")
+    m.caja((lado * 0.54, 0, 1.06), (0.12, 0.12, 0.40), "Bronce")
+m.esfera((0, 0, 1.62), (0.15, 0.15, 0.15), 6, 4, "Energia")
+m.exportar()
