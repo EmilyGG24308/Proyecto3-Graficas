@@ -1,5 +1,9 @@
 # Pendientes del Proyecto 3 (para Esteban y Emily)
 
+> **Para crear sus mundos lean primero [GUIA_MUNDOS.md](GUIA_MUNDOS.md)**:
+> reparto, archivos propios, reglas técnicas y visuales, y el prompt para
+> su IA.
+
 Este archivo dice qué falta, cuántos puntos da y **cómo hacerlo con el código
 que ya existe**. La rúbrica completa está en `PROYECTO_FINAL GRAFICAS 2026.pdf`.
 

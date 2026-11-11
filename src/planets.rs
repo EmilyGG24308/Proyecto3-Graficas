@@ -18,10 +18,15 @@ use crate::scene::asset_path;
 use crate::shaders::{HauntedShader, JungleShader};
 
 pub fn solar_system() -> Result<Vec<Planet>, String> {
-    Ok(vec![jungle()?, haunted()?])
+    let mut planets = vec![jungle()?, haunted()?];
+    // Cada integrante agrega sus mundos en su propio archivo (src/mundos/).
+    planets.extend(crate::mundos::esteban::planetas()?);
+    planets.extend(crate::mundos::emily::planetas()?);
+    Ok(planets)
 }
 
-fn model(name: &str) -> Result<Mesh, String> {
+/// Carga `assets/models/<name>.obj` (con su `.mtl`).
+pub fn model(name: &str) -> Result<Mesh, String> {
     mesh::load_obj(asset_path(&format!("assets/models/{name}.obj")))
 }
 

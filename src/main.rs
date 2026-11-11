@@ -10,6 +10,7 @@ mod config;
 mod framebuffer;
 mod math;
 mod mesh;
+mod mundos;
 mod noise;
 mod planet;
 mod planets;
