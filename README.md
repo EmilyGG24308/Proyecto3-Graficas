@@ -11,6 +11,10 @@ ventana, la entrada y mostrar el framebuffer.
 
 ![Casona embrujada](capturas/embrujado_casona.png)
 
+| Lava | Desierto y anillo de asteroides |
+|---|---|
+| ![Lava](capturas/lava.png) | ![Desierto](capturas/desierto.png) |
+
 > 🚧 En desarrollo. Ver [PENDIENTES.md](PENDIENTES.md) para el estado de la
 > rúbrica y lo que falta.
 
@@ -19,7 +23,7 @@ ventana, la entrada y mostrar el framebuffer.
 | Nombre | Carné | Contribución |
 |---|---|---|
 | Martin Villatoro | 24033 | Pipeline de rasterización, nave y física, colisiones, planetas/LOD/culling |
-| Esteban de la Peña | | Planetas Lava y Desierto (ver `GUIA_MUNDOS.md`) |
+| Esteban de la Peña | 24171 | Planetas Lava y Desierto, shaders, modelos y anillo de asteroides (`src/mundos/esteban.rs`) |
 | Emily Góngora | | Planetas Ciudad y Hielo (ver `GUIA_MUNDOS.md`) |
 
 ## Cómo ejecutar
@@ -65,5 +69,5 @@ cargo run --release
 
 ## Uso de IA
 
-Parte del código se escribió con asistencia de Claude (Anthropic). Todo el
+Parte del código se escribió con asistencia de Claude (Anthropic) y de IA de OpenAI para los mundos de Esteban. Todo el
 equipo revisó y debe poder explicar el código entregado.
