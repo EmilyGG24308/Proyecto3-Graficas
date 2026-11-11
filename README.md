@@ -15,7 +15,9 @@ ventana, la entrada y mostrar el framebuffer.
 |---|---|
 | ![Lava](capturas/lava.png) | ![Desierto](capturas/desierto.png) |
 
-![Planeta mecánico](capturas/mecanico.png)
+| Mecánico | Cristalino |
+|---|---|
+| ![Mecánico](capturas/mecanico.png) | ![Cristalino](capturas/cristalino.png) |
 
 > 🚧 En desarrollo. Ver [PENDIENTES.md](PENDIENTES.md) para el estado de la
 > rúbrica y lo que falta.
@@ -25,7 +27,7 @@ ventana, la entrada y mostrar el framebuffer.
 | Nombre | Carné | Contribución |
 |---|---|---|
 | Martin Villatoro | 24033 | Pipeline de rasterización, nave y física, colisiones, planetas/LOD/culling |
-| Esteban de la Peña | 24171 | Planetas Lava, Desierto y Mecánico, shaders, modelos y anillo de asteroides (`src/mundos/esteban.rs`) |
+| Esteban de la Peña | 24171 | Planetas Lava, Desierto, Mecánico y Cristalino, shaders, modelos y anillo de asteroides (`src/mundos/esteban.rs`) |
 | Emily Góngora | | Planetas Ciudad y Hielo (ver `GUIA_MUNDOS.md`) |
 
 ## Cómo ejecutar

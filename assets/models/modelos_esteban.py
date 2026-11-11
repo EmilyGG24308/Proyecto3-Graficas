@@ -1,4 +1,4 @@
-"""Modelos low-poly de lava y desierto. Ejecutar con Blender en modo background."""
+"""Modelos low-poly de los planetas de Esteban. Ejecutar con Blender en modo background."""
 import math
 import os
 
