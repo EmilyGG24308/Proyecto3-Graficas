@@ -37,14 +37,14 @@ de cerca debería quedar por debajo de ~10 ms en una Mac M-series.
 | Planeta 1: Jungla jurásica | 10 | ✅ | `planets.rs`, `shaders/jungle.rs` |
 | Planeta 2: Embrujado | 10 | ✅ | `planets.rs`, `shaders/haunted.rs` |
 | Planetas 3–6 (2 de Esteban, 2 de Emily) | 30 (máx. 5 planetas puntúan) | ⬜ | ver §3 |
-| 4 shaders distintos (ya hay 5: sol, jungla, embrujado, toon, flama) | 24 | ✅ | `src/shaders/` |
+| 4 shaders distintos (ya hay 6: sol, jungla, embrujado, toon, flama, fantasma) | 24 | ✅ | `src/shaders/` |
 | Shader animado (sol, flama, lava de la jungla, niebla del embrujado) | 8 | ✅ | `sun.rs`, `thruster.rs`, `jungle.rs`, `haunted.rs` |
 | Deformación del planeta con ruido | 10 | ✅ | `planet.rs` → `build_terrain_mesh` |
 | Generación/subdivisión de geometría (icosfera) | 10 | ✅ | `mesh.rs` → `icosphere` |
 | Normal mapping | 8 | ⬜ | ver §6 |
-| Tipos de modelo sobre planetas (4 × 5) | 20 | ⬜ | ver §4 |
-| Distribución procedural con semilla | 10 | ⬜ | ver §4 |
-| Posición/orientación sobre superficie curva | 5 | ⬜ | ver §4 |
+| Tipos de modelo sobre planetas (4 × 5) — ya hay 7: palmera, helecho, esqueleto de dino, árbol seco, lápida, casona, fantasma | 20 | ✅ | `assets/models/modelos_superficie.py` |
+| Distribución procedural con semilla | 10 | ✅ | `src/props.rs` → `place` (tests `same_seed_same_positions…`) |
+| Posición/orientación sobre superficie curva | 5 | ✅ | `src/props.rs` → `instance_matrix` |
 | Aceleración/frenado/giro progresivos (FPS-independiente) | 8 | ✅ | `ship.rs` (test `same_result_at_30_and_144_fps`) |
 | Colisión con el planeta | 4 | ✅ | `collision.rs` (usa la altura real del terreno) |
 | Modo de control local para rodear un planeta | 8 | ⬜ | ver §5 |
@@ -53,9 +53,9 @@ de cerca debería quedar por debajo de ~10 ms en una Mac M-series.
 | LOD por distancia | 8 | ✅ | `scene.rs` → `select_lod`, tecla F4 |
 | Coherencia visual + claridad (presentación) | 10 | 🟡 | se cierra con el video y el README |
 
-**Hecho: 99 puntos técnicos** (+ hasta 10 de presentación).
-Con un planeta más ya pasamos de 100; el resto es margen por si el profesor
-da fracciones de algún punto. Ojo: la rúbrica paga como máximo 5 planetas
+**Hecho: 134 puntos técnicos** (+ hasta 10 de presentación). Ya pasamos de
+100: lo que falta es margen por si el profesor da fracciones de algún punto,
+y para que cada quien tenga su contribución que explicar. Ojo: la rúbrica paga como máximo 5 planetas
 (50 pts); el sexto no suma, pero tampoco resta.
 
 Comparación ya medida (para la presentación):
@@ -101,7 +101,24 @@ de cada shader en `planets.rs`.
 
 ---
 
-## 4. Modelos sobre la superficie (hasta 35 pts)
+## 4. Modelos sobre la superficie (ya funciona: úsenlo en sus planetas)
+
+**Ya está implementado** en `src/props.rs` y lo usan la Jungla y el
+Embrujado (ver `planets.rs`). Para su planeta solo tienen que:
+
+1. Modelar sus objetos agregando una sección a
+   `assets/models/modelos_superficie.py` (o un script propio) y correrlo.
+2. Agregar `.with_props(vec![PropSpec { .. }])` a su planeta en `planets.rs`
+   con las reglas: cuántos, escala, rango de altura, ruido de densidad,
+   pendiente máxima. `Placement::Highest` pone UNO en la cima (como la casona).
+3. Opcional: `.with_floaters(FloaterSpec { .. })` para cosas que vuelan
+   (como los fantasmas).
+
+Todo se hornea en una sola malla por planeta y solo se dibuja de cerca
+(`PROPS_MIN_PX` en `config.rs`). Midan con `--bench` después de agregarlos.
+
+Lo que sigue explica cómo funciona por dentro (para poder explicarlo en la
+demo):
 
 **Modelos (5 pts por tipo, máx. 4):** árbol, edificio, roca/arco, cristal…
 Deben ser hechos por nosotros. Lo más rápido: un script de Blender como

@@ -19,7 +19,7 @@ use crate::planet::{Planet, Terrain, build_terrain_mesh};
 use crate::planets;
 use crate::renderer::{DrawOptions, Renderer};
 use crate::shader::{Shader, Uniforms};
-use crate::shaders::{SunShader, ThrusterDraw, ThrusterParams, ThrusterShader, ToonShader};
+use crate::shaders::{GhostDraw, GhostShader, SunShader, ThrusterDraw, ThrusterParams, ThrusterShader, ToonShader};
 use crate::ship::{self, ShipState};
 use crate::starfield::Starfield;
 
@@ -40,6 +40,8 @@ pub struct BodyReport {
     /// None = descartado por estar fuera de la vista.
     pub lod: Option<usize>,
     pub triangles: usize,
+    /// Triángulos de objetos de superficie dibujados (0 si no tocaba).
+    pub props_triangles: usize,
     pub pixels: f32,
 }
 
@@ -52,6 +54,7 @@ pub struct Scene {
     sun_shader: SunShader,
     toon: ToonShader,
     thruster: ThrusterShader,
+    ghost: GhostShader,
     /// Interruptores para comparar en vivo (F3 / F4).
     pub culling_enabled: bool,
     pub lod_enabled: bool,
@@ -81,12 +84,13 @@ impl Scene {
                 .iter()
                 .map(|&s| build_terrain_mesh(&Terrain::FLAT, &sun_noise, s.min(4)))
                 .collect(),
-            planets: planets::solar_system(),
+            planets: planets::solar_system()?,
             ship_mesh: mesh::load_obj(asset_path("assets/models/nave.obj"))?,
             flame_mesh: mesh::cone(12, 4),
             sun_shader: SunShader { noise: sun_noise, speed: SUN_ANIM_SPEED, bands: 6.0 },
             toon: ToonShader { ambient: 0.36, outline: 0.35 },
             thruster: ThrusterShader { noise: Perlin::new(WORLD_SEED + 7) },
+            ghost: GhostShader { glow: 1.6 },
             culling_enabled: true,
             lod_enabled: true,
         })
@@ -130,13 +134,13 @@ impl Scene {
         let pixels = r.projected_radius_px(center, bounding_radius);
         if self.culling_enabled && !r.sphere_visible(center, bounding_radius) {
             r.stats.objects_culled += 1;
-            return BodyReport { name, lod: None, triangles: 0, pixels };
+            return BodyReport { name, lod: None, triangles: 0, props_triangles: 0, pixels };
         }
         let lod = if self.lod_enabled { select_lod(pixels, lods.len()) } else { lods.len() - 1 };
         let mesh = &lods[lod];
         let u = Uniforms { model: *model, object_center: center, ..*base };
         r.draw_mesh(mesh, model, shader, &u, DrawOptions::default());
-        BodyReport { name, lod: Some(lod), triangles: mesh.triangle_count(), pixels }
+        BodyReport { name, lod: Some(lod), triangles: mesh.triangle_count(), props_triangles: 0, pixels }
     }
 
     pub fn render(&self, r: &mut Renderer, camera: &Camera, time: f32, ship: Option<&ShipView>) -> Vec<BodyReport> {
@@ -160,10 +164,49 @@ impl Scene {
         report.push(self.draw_body(r, "Sol", &self.sun_lods, &sun_model, sun_pos, SUN_RADIUS, &self.sun_shader, &base));
 
         // --- Planetas -------------------------------------------------------
+        let mut ghosts = Vec::new();
         for p in &self.planets {
             let model = p.model(time);
             let center = p.position(time);
-            report.push(self.draw_body(r, p.def.name, &p.lods, &model, center, p.bounding_radius, p.shader.as_ref(), &base));
+            let mut rep = self.draw_body(r, p.def.name, &p.lods, &model, center, p.bounding_radius, p.shader.as_ref(), &base);
+            // Objetos de superficie: solo si el planeta es visible y lo
+            // bastante grande en pantalla (con LOD apagado, siempre).
+            let near = !self.lod_enabled || rep.pixels >= PROPS_MIN_PX;
+            if rep.lod.is_some() && near {
+                if let Some(props) = &p.props {
+                    let u = Uniforms { model, object_center: center, ..base };
+                    let opts = DrawOptions { double_sided: true, ..DrawOptions::default() };
+                    r.draw_mesh(&props.mesh, &model, &self.toon, &u, opts);
+                    rep.props_triangles += props.mesh.triangle_count();
+                }
+                if let Some(f) = &p.floaters {
+                    ghosts.push((p, f, center));
+                }
+            }
+            report.push(rep);
+        }
+
+        // --- Fantasmas (aditivos: después de lo opaco) -----------------------
+        for (p, floaters, center) in ghosts {
+            let rot = p.rotation(time);
+            for g in &floaters.items {
+                let vis = g.visibility(time);
+                if vis <= 0.01 {
+                    continue;
+                }
+                let up = rot.transform_dir(g.dir(time));
+                let pos = center + up * (p.def.radius + g.height(time));
+                // Siempre de frente a la cámara (el modelo mira hacia -Z).
+                let to_cam = camera.eye - pos;
+                let facing = (to_cam - up * to_cam.dot(up)).normalize();
+                let z = -facing;
+                let right = up.cross(z).normalize();
+                let model = Mat4::translation(pos) * Mat4::from_basis(right, up, right.cross(up)) * Mat4::uniform_scale(g.scale);
+                let u = Uniforms { model, object_center: pos, ..base };
+                let draw = GhostDraw { shader: &self.ghost, visibility: vis };
+                let opts = DrawOptions { double_sided: false, depth_write: false, additive: true };
+                r.draw_mesh(&floaters.mesh, &model, &draw, &u, opts);
+            }
         }
 
         // --- Nave -----------------------------------------------------------

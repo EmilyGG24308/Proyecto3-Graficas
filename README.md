@@ -9,6 +9,8 @@ ventana, la entrada y mostrar el framebuffer.
 |---|---|
 | ![Jungla](capturas/jungla.png) | ![Embrujado](capturas/embrujado.png) |
 
+![Casona embrujada](capturas/embrujado_casona.png)
+
 > 🚧 En desarrollo. Ver [PENDIENTES.md](PENDIENTES.md) para el estado de la
 > rúbrica y lo que falta.
 
@@ -56,8 +58,10 @@ cargo run --release
 | `src/scene.rs` | Culling, selección de LOD y orden de dibujo |
 | `src/ship.rs` | Física de vuelo con paso fijo de 120 Hz |
 | `src/collision.rs` | Colisión nave–planeta con la altura real del terreno |
-| `src/shaders/` | Fragment shaders: sol, jungla, embrujado, toon (nave), flama |
+| `src/props.rs` | Objetos de superficie: distribución con semilla y ruido, orientación, horneado; fantasmas |
+| `src/shaders/` | Fragment shaders: sol, jungla, embrujado, toon (nave y objetos), flama, fantasma |
 | `assets/models/nave_cohete.py` | Script de Blender que genera la nave |
+| `assets/models/modelos_superficie.py` | Script de Blender: palmera, helecho, esqueleto, árbol seco, lápida, casona, fantasma |
 
 ## Uso de IA
 

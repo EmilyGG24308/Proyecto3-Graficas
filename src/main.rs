@@ -13,6 +13,7 @@ mod mesh;
 mod noise;
 mod planet;
 mod planets;
+mod props;
 mod renderer;
 mod scene;
 mod shader;
@@ -251,7 +252,14 @@ fn main() {
             ];
             for b in &bodies {
                 lines.push(match b.lod {
-                    Some(l) => format!("  {}: LOD {} ({} tris, {:.0} px)", b.name, l, b.triangles, b.pixels.min(9999.0)),
+                    Some(l) => format!(
+                        "  {}: LOD {} ({} tris{}, {:.0} px)",
+                        b.name,
+                        l,
+                        b.triangles,
+                        if b.props_triangles > 0 { format!(" + {} objetos", b.props_triangles) } else { String::new() },
+                        b.pixels.min(9999.0)
+                    ),
                     None => format!("  {}: fuera de vista", b.name),
                 });
             }
@@ -367,7 +375,7 @@ fn snapshot(args: &[String]) {
     std::fs::write(&out, ppm).expect("no se pudo escribir la captura");
     let alt = colliders.iter().map(|c| c.signed_distance(state.pos)).fold(f32::INFINITY, f32::min);
     for b in &bodies {
-        println!("  {}: lod {:?}, {} tris, {:.0} px", b.name, b.lod, b.triangles, b.pixels);
+        println!("  {}: lod {:?}, {} tris + {} objetos, {:.0} px", b.name, b.lod, b.triangles, b.props_triangles, b.pixels);
     }
     println!(
         "{out}: {ms:.1} ms, nave {} tris, distancia a superficie {alt:.2}, contacto '{}', stats = {:?}",

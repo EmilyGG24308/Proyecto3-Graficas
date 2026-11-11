@@ -28,6 +28,10 @@ pub const LOD_SUBDIVISIONS: [u32; 4] = [2, 3, 4, 5];
 /// Radio en pantalla (pixeles) a partir del cual se usa el siguiente nivel.
 pub const LOD_PIXEL_THRESHOLDS: [f32; 3] = [18.0, 55.0, 140.0];
 
+/// Los objetos de superficie solo se dibujan cuando el planeta mide al menos
+/// esto en pantalla (radio en pixeles). De lejos no se distinguen.
+pub const PROPS_MIN_PX: f32 = 90.0;
+
 // Los parámetros de cada planeta (radio, órbita, semilla…) están en
 // `src/planets.rs`.
 

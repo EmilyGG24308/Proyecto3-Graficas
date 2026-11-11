@@ -13,6 +13,7 @@ use crate::config::LOD_SUBDIVISIONS;
 use crate::math::{Mat4, Vec3};
 use crate::mesh::{self, Mesh};
 use crate::noise::Perlin;
+use crate::props::{BakedProps, FloaterSpec, Floaters, Ground, PropSpec, bake, spawn_floaters};
 use crate::shader::Shader;
 
 #[derive(Clone, Copy, Debug)]
@@ -94,8 +95,12 @@ pub struct Planet {
     /// Una malla por nivel de detalle (índice 0 = la más simple).
     pub lods: Vec<Mesh>,
     pub shader: Box<dyn Shader + Send>,
-    /// Radio de la esfera envolvente en mundo (incluye las montañas).
+    /// Radio de la esfera envolvente en mundo (incluye montañas y objetos).
     pub bounding_radius: f32,
+    /// Objetos de superficie horneados en una sola malla (espacio local).
+    pub props: Option<BakedProps>,
+    /// Objetos animados que flotan sobre el planeta (fantasmas).
+    pub floaters: Option<Floaters>,
 }
 
 impl Planet {
@@ -106,7 +111,24 @@ impl Planet {
             .map(|&s| build_terrain_mesh(&def.terrain, &noise, s))
             .collect();
         let bounding_radius = lods.iter().map(|m| m.bounding_radius).fold(1.0, f32::max) * def.radius;
-        Self { def, noise, lods, shader, bounding_radius }
+        Self { def, noise, lods, shader, bounding_radius, props: None, floaters: None }
+    }
+
+    /// Reparte y hornea los objetos de superficie (ver `props.rs`).
+    pub fn with_props(mut self, specs: Vec<PropSpec>) -> Self {
+        let ground = Ground { terrain: &self.def.terrain, noise: &self.noise, radius: self.def.radius, seed: self.def.seed };
+        let baked = bake(&ground, &specs);
+        self.bounding_radius = self.bounding_radius.max(baked.mesh.bounding_radius * self.def.radius);
+        self.props = Some(baked);
+        self
+    }
+
+    /// Agrega objetos que flotan alrededor del planeta.
+    pub fn with_floaters(mut self, spec: FloaterSpec) -> Self {
+        let top = spec.altitude.1 + spec.scale.1;
+        self.bounding_radius = self.bounding_radius.max(self.def.radius + top);
+        self.floaters = Some(spawn_floaters(self.def.seed, spec));
+        self
     }
 
     /// Centro del planeta en el instante `t` (segundos). Depende solo del
