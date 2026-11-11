@@ -160,3 +160,45 @@ pub fn hash3(p: Vec3) -> f32 {
     let h = (p.x * 127.1 + p.y * 311.7 + p.z * 74.7).sin() * 43_758.547;
     h - h.floor()
 }
+
+/// Resultado del ruido celular (Worley / Voronoi).
+#[derive(Clone, Copy, Debug)]
+pub struct Cell {
+    /// Distancia al punto de celda más cercano.
+    pub f1: f32,
+    /// Distancia al segundo más cercano (f2 - f1 ≈ 0 en los bordes).
+    pub f2: f32,
+    /// Valor aleatorio fijo de la celda más cercana, en [0, 1).
+    pub id: f32,
+}
+
+/// Ruido celular 3D: el espacio se divide en cubos, cada cubo tiene un punto
+/// en una posición aleatoria (fija), y se mide la distancia a los puntos de
+/// los 27 cubos vecinos. Sirve para copas de árboles, piedras, escamas…
+pub fn worley(p: Vec3) -> Cell {
+    let base = Vec3::new(p.x.floor(), p.y.floor(), p.z.floor());
+    let mut f1 = f32::MAX;
+    let mut f2 = f32::MAX;
+    let mut id = 0.0;
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            for dz in -1..=1 {
+                let cell = base + Vec3::new(dx as f32, dy as f32, dz as f32);
+                let jitter = Vec3::new(
+                    hash3(cell),
+                    hash3(cell + Vec3::new(17.31, 3.7, 9.1)),
+                    hash3(cell + Vec3::new(5.17, 41.3, 23.9)),
+                );
+                let d = (cell + jitter - p).length();
+                if d < f1 {
+                    f2 = f1;
+                    f1 = d;
+                    id = hash3(cell + Vec3::new(71.7, 11.3, 57.1));
+                } else if d < f2 {
+                    f2 = d;
+                }
+            }
+        }
+    }
+    Cell { f1, f2, id }
+}

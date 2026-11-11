@@ -273,7 +273,7 @@ fn main() {
 /// Renderiza un cuadro sin abrir ventana y lo guarda como PPM. Sirve para
 /// capturas del README y para probar el pipeline sin interfaz.
 ///
-/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|rasante|cabina|nave|choque] [--sin-culling] [--sin-lod]`
+/// Uso: `cargo run --release -- --snapshot <segundos> <archivo.ppm> [lejos|cerca|rasante|cabina|nave|choque] [--sin-culling] [--sin-lod] [--planeta N]`
 fn snapshot(args: &[String]) {
     let time: f32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(10.0);
     let out = args.get(3).cloned().unwrap_or_else(|| "snapshot.ppm".into());
@@ -285,7 +285,15 @@ fn snapshot(args: &[String]) {
     let mut renderer = Renderer::new(RENDER_W, RENDER_H);
 
     // Se simula la nave volando unos segundos hacia el objetivo elegido.
-    let p0 = &scene.planets[0];
+    // --planeta N elige a qué planeta acercarse (0 = el primero).
+    let pi: usize = args
+        .iter()
+        .position(|a| a == "--planeta")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0)
+        .min(scene.planets.len() - 1);
+    let p0 = &scene.planets[pi];
     let planet = p0.position(time);
     let pr = p0.def.radius;
     let (start, target) = match mode {

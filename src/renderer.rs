@@ -153,7 +153,11 @@ impl Renderer {
         if depth <= radius {
             return f32::INFINITY; // la cámara está encima o dentro
         }
-        radius / depth * self.proj.m[1][1] * self.fb.height as f32 * 0.5
+        // Tamaño angular real de una esfera: r / sqrt(d² - r²) (de cerca una
+        // esfera se ve más grande que r / d).
+        let dist = self.view.transform_point(center).length();
+        let tan_half = radius / (dist * dist - radius * radius).max(1e-6).sqrt();
+        tan_half * self.proj.m[1][1] * self.fb.height as f32 * 0.5
     }
 
     // -----------------------------------------------------------------------

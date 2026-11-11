@@ -5,7 +5,9 @@ cohete. Todo el 3D (transformaciones, recorte, rasterización, z-buffer,
 shaders) está implementado en este repositorio; raylib solo se usa para la
 ventana, la entrada y mostrar el framebuffer.
 
-![Vista cercana del planeta bosque](capturas/cerca.png)
+| Jungla jurásica | Planeta embrujado |
+|---|---|
+| ![Jungla](capturas/jungla.png) | ![Embrujado](capturas/embrujado.png) |
 
 > 🚧 En desarrollo. Ver [PENDIENTES.md](PENDIENTES.md) para el estado de la
 > rúbrica y lo que falta.
@@ -49,12 +51,12 @@ cargo run --release
 | `src/math.rs` | Vectores y matrices propios (look-at, perspectiva, rotaciones) |
 | `src/renderer.rs` | Pipeline: vertex stage, recorte, backface, rasterización multihilo, z-buffer |
 | `src/mesh.rs` | Icosfera subdividida, cono, cargador `.obj`/`.mtl` |
-| `src/noise.rs` | Perlin 3D con semilla, fBm, ridged |
+| `src/noise.rs` | Perlin 3D con semilla, fBm, ridged, ruido celular (Worley) |
 | `src/planet.rs` / `src/planets.rs` | Planetas: órbita, giro, terreno deformado, LODs / catálogo |
 | `src/scene.rs` | Culling, selección de LOD y orden de dibujo |
 | `src/ship.rs` | Física de vuelo con paso fijo de 120 Hz |
 | `src/collision.rs` | Colisión nave–planeta con la altura real del terreno |
-| `src/shaders/` | Fragment shaders: sol, bosque, toon, flama |
+| `src/shaders/` | Fragment shaders: sol, jungla, embrujado, toon (nave), flama |
 | `assets/models/nave_cohete.py` | Script de Blender que genera la nave |
 
 ## Uso de IA

@@ -2,7 +2,7 @@
 //! parámetros (radio, órbita, velocidad, semilla, relieve, shader).
 //!
 //! Para agregar un planeta nuevo:
-//!  1. Crear su shader en `src/shaders/<nombre>.rs` (ver `forest.rs`) y
+//!  1. Crear su shader en `src/shaders/<nombre>.rs` (ver `jungle.rs`) y
 //!     registrarlo en `src/shaders/mod.rs`.
 //!  2. Agregar un `Planet::new(PlanetDef { .. }, Box::new(MiShader { .. }))`
 //!     a la lista de `solar_system()`.
@@ -12,23 +12,23 @@
 use crate::config::WORLD_SEED;
 use crate::noise::Perlin;
 use crate::planet::{Orbit, Planet, PlanetDef, Terrain, TerrainKind};
-use crate::shaders::ForestShader;
+use crate::shaders::{HauntedShader, JungleShader};
 
 pub fn solar_system() -> Vec<Planet> {
-    vec![forest()]
+    vec![jungle(), haunted()]
 }
 
-/// Planeta bosque: pradera con lagos, flores y montañas nevadas.
-fn forest() -> Planet {
+/// Jungla jurásica: selva densa, ríos, pantanos, acantilados y volcanes.
+fn jungle() -> Planet {
     let terrain = Terrain {
         kind: TerrainKind::Smooth,
-        amplitude: 0.14,
-        frequency: 1.6,
+        amplitude: 0.16,
+        frequency: 1.8,
         octaves: 5,
-        sea_level: Some(-0.12),
+        sea_level: Some(-0.14),
     };
     let def = PlanetDef {
-        name: "Bosque",
+        name: "Jungla",
         radius: 8.0,
         orbit: Orbit { radius: 60.0, speed: 0.025, phase: 0.6, inclination: 0.0 },
         spin_speed: 0.10,
@@ -36,11 +36,40 @@ fn forest() -> Planet {
         seed: WORLD_SEED + 1,
         terrain,
     };
-    let shader = ForestShader {
+    let shader = JungleShader {
         noise: Perlin::new(def.seed + 100),
         amplitude: terrain.amplitude,
         sea_level: terrain.sea_level.unwrap_or(-1.0),
-        flower_density: 0.12,
+        canopy_scale: 65.0,
+        volcano_height: 0.3,
+    };
+    Planet::new(def, Box::new(shader))
+}
+
+/// Planeta embrujado: tierra muerta, senderos, farolitos y niebla fantasmal.
+fn haunted() -> Planet {
+    let terrain = Terrain {
+        kind: TerrainKind::Ridged,
+        amplitude: 0.07,
+        frequency: 2.4,
+        octaves: 4,
+        sea_level: None,
+    };
+    let def = PlanetDef {
+        name: "Embrujado",
+        radius: 6.5,
+        orbit: Orbit { radius: 100.0, speed: 0.015, phase: 3.4, inclination: 0.12 },
+        spin_speed: 0.06,
+        axial_tilt: 0.2,
+        seed: WORLD_SEED + 13,
+        terrain,
+    };
+    let shader = HauntedShader {
+        noise: Perlin::new(def.seed + 100),
+        amplitude: terrain.amplitude,
+        fog_density: 0.9,
+        fog_speed: 0.06,
+        lantern_density: 0.08,
     };
     Planet::new(def, Box::new(shader))
 }

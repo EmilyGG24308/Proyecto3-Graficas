@@ -31,10 +31,11 @@ Opciones: `--sin-culling`, `--sin-lod` (para comparar contadores).
 
 | Característica | Pts | Estado | Dónde |
 |---|---|---|---|
-| Planeta 1 (Bosque) | 10 | ✅ | `planets.rs`, `shaders/forest.rs` |
-| Planetas 2–5 (ciudad, lava, hielo, desierto) | 40 | ⬜ | ver §3 |
-| 4 shaders distintos (sol, bosque, toon, flama) | 24 | ✅ | `src/shaders/` |
-| Shader animado (sol, flama) | 8 | ✅ | `sun.rs`, `thruster.rs` |
+| Planeta 1: Jungla jurásica | 10 | ✅ | `planets.rs`, `shaders/jungle.rs` |
+| Planeta 2: Embrujado | 10 | ✅ | `planets.rs`, `shaders/haunted.rs` |
+| Planetas 3–6 (2 de Esteban, 2 de Emily) | 30 (máx. 5 planetas puntúan) | ⬜ | ver §3 |
+| 4 shaders distintos (ya hay 5: sol, jungla, embrujado, toon, flama) | 24 | ✅ | `src/shaders/` |
+| Shader animado (sol, flama, lava de la jungla, niebla del embrujado) | 8 | ✅ | `sun.rs`, `thruster.rs`, `jungle.rs`, `haunted.rs` |
 | Deformación del planeta con ruido | 10 | ✅ | `planet.rs` → `build_terrain_mesh` |
 | Generación/subdivisión de geometría (icosfera) | 10 | ✅ | `mesh.rs` → `icosphere` |
 | Normal mapping | 8 | ⬜ | ver §6 |
@@ -49,20 +50,22 @@ Opciones: `--sin-culling`, `--sin-lod` (para comparar contadores).
 | LOD por distancia | 8 | ✅ | `scene.rs` → `select_lod`, tecla F4 |
 | Coherencia visual + claridad (presentación) | 10 | 🟡 | se cierra con el video y el README |
 
-**Hecho: 89 puntos técnicos** (+ hasta 10 de presentación).
-Con 2 planetas más ya pasamos de 100; el resto es margen por si el profesor
-da fracciones de algún punto.
+**Hecho: 99 puntos técnicos** (+ hasta 10 de presentación).
+Con un planeta más ya pasamos de 100; el resto es margen por si el profesor
+da fracciones de algún punto. Ojo: la rúbrica paga como máximo 5 planetas
+(50 pts); el sexto no suma, pero tampoco resta.
 
 Comparación ya medida (para la presentación):
 - LOD: vista lejana = **2 988** triángulos de entrada; con `--sin-lod` = **26 988**.
-- Culling: cerca del bosque con el sol fuera de vista = **6 508**; con `--sin-culling` = **11 628**.
+- Culling: cerca de la jungla, con el sol y el embrujado fuera de vista = **21 868**; con `--sin-culling` = **27 308**.
 
 ---
 
 ## 3. Agregar un planeta (≈ 30 min cada uno)
 
-1. Copiar `src/shaders/forest.rs` como `src/shaders/lava.rs` (por ejemplo) y
-   cambiar el efecto. Registrarlo en `src/shaders/mod.rs`.
+1. Copiar `src/shaders/jungle.rs` (o `haunted.rs`) como
+   `src/shaders/lava.rs` (por ejemplo) y cambiar el efecto. Registrarlo en
+   `src/shaders/mod.rs`.
 2. En `src/planets.rs` hay una plantilla comentada `fn lava()`. Llenarla y
    agregarla a `solar_system()`.
 
@@ -83,6 +86,11 @@ En un shader tienen a mano (`Varyings`): `world_pos`, `normal`, `local_pos`
 (posición en la esfera unitaria deformada → la altura es `local_pos.length() - 1`),
 `uv`, `color`. Y en `Uniforms`: `time`, `camera_pos`, `sun_pos`.
 Funciones útiles en `shader.rs`: `lambert`, `blinn_phong`, `rim`, `toon_diffuse`.
+En `noise.rs`: `Perlin::fbm`, `Perlin::ridged`, `worley` (ruido celular:
+copas de árboles, farolitos, piedras), `hash3`.
+
+Los dos planetas hechos usan: Jungla → órbita 60, Embrujado → órbita 100.
+Elijan órbitas que no choquen (por ejemplo 30, 45, 80, 120).
 
 Para la demo, el profesor puede pedir cambiar **radio, velocidad orbital,
 semilla o intensidad de un shader**: todo está en `PlanetDef` y en los campos
@@ -163,7 +171,7 @@ alrededor sin cortar el vuelo. Idea: guardar el planeta objetivo y la altura;
 en cada paso, proyectar la velocidad sobre el plano tangente
 (`vel -= n * vel.dot(n)` con `n` = dirección desde el centro), corregir la
 altura con un resorte suave, y re-orientar `up` hacia `n`. Mostrar en el HUD
-"MODO ÓRBITA: Bosque". Al presionar `O` otra vez vuelve el vuelo libre.
+"MODO ÓRBITA: Jungla". Al presionar `O` otra vez vuelve el vuelo libre.
 
 ---
 
